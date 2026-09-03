@@ -1,0 +1,7 @@
+interface:
+  display_name: "AgentCiCi 平台管理"
+  short_description: "设计并管理智能体、技能和 MCP 服务"
+  brand_color: "#A67C2F"
+  default_prompt: "使用 $cc-aidev-agent-guidelines-common 了解并管理当前组织的智能体、技能和 MCP 服务。"
+policy:
+  allow_implicit_invocation: true
