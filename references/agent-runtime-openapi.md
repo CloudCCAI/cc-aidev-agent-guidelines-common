@@ -38,3 +38,7 @@ curl -X POST "$AGENTCICI_BASE_URL/openapi/v1/chat-messages" \
 | 导入远程文件 | `POST /openapi/v1/files/import` |
 
 上传接口返回文件 `id` 后，在 `chat-messages.files[].upload_file_id` 中引用。文件类型、大小、模型能力或解析失败都应作为明确错误处理，不要静默忽略附件。
+
+## 发布与凭据相互独立
+
+开启 API 渠道即可满足发布入口条件，不要求先创建 Key。未发布的智能体也可创建 Key，开发者管理接口仍检查智能体存在及 OPENAPI 权限。创建 Key 不会自动发布或开启渠道；实际调用仍需要满足运行端的鉴权、发布及渠道条件。

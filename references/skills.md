@@ -9,7 +9,7 @@
 - `toolWhitelist`、`kbWhitelist` 应保持最小集合。
 - `handoffRule` 明确转人工条件；`outputContract` 明确可验证输出；`riskLevel` 使用 `LOW`、`MEDIUM` 或 `HIGH`。
 - 平台标准技能可读取，但通常不可编辑或删除；管理 API 创建的都是租户自定义技能。
-- CRUD 只管理草稿定义，不包含发布、回滚、导入导出和智能编写。
+- 创建与编辑只管理草稿；compile 预览编译，publish 重新编译校验并产生已发布快照。回滚、导入导出和智能编写另行核对接口。
 
 ## 管理 API
 
@@ -39,3 +39,19 @@
   "riskLevel": "MEDIUM"
 }
 ```
+
+## 编译与发布
+
+新增接口需要部署包含本次扩展的后端；404 时停止并报告服务端未提供能力，不改用后台登录接口。
+
+- `POST /openapi/v1/management/skills/{skillId}/compile`，`skill.write`：编译已保存草稿，返回 warnings、compileSummary 等，不发布。
+- `POST /openapi/v1/management/skills/{skillId}/publish`，`skill.write`：可传 `{"changeLog":"说明"}`，后端重新校验，阻塞错误会拒绝发布。
+- CLI `skills update` 自动 GET 并合并可写字段，所以还需要 `skill.read`；未提供字段保留，列表提供 `[]` 则清空。
+
+```bash
+python3 scripts/agentcici_manage.py skills compile SKILL_ID
+python3 scripts/agentcici_manage.py skills publish SKILL_ID --change-log '生日邮件技能初版'
+python3 scripts/agentcici_manage.py skills delete SKILL_ID --confirm-id SKILL_ID
+```
+
+检查编译警告后再发布，确认返回 `currentPublishedVersionId`。技能更新不会自动改变智能体已固定的发布快照；需要重新编译发布关联智能体。

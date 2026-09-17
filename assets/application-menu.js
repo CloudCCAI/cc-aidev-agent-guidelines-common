@@ -1,0 +1,1 @@
+(function(){var marker="__AGENTCICI_SITE_URL__",s=document.createElement('script');var u=new URL(__SDK_URL__,document.baseURI);u.searchParams.set('_t',new Date().getTime());s.src=u.href;s.onload=function(){s.remove();window.AgentCiCiApp.mount({appCode:__APP_CODE__});};s.onerror=function(){s.remove();alert('AI 应用 SDK 加载失败。');};document.head.append(s);})();
