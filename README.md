@@ -1,202 +1,141 @@
 # AgentCiCi 开发与管理 Skill
 
-`cc-aidev-agent-guidelines-common` 是面向 Codex 等 AI 开发助手的 AgentCiCi 技能包，用于：
+`cc-aidev-agent-guidelines-common` 是给 Codex 等 AI 智能体使用的 AgentCiCi 技能包。用户只需要用自然语言说明想做什么，Skill 会自动读取必要规范、调用内置工具并返回结果。
 
-- 管理组织内的智能体、技能和 MCP 服务。
+它可以帮你：
+
+- 登录 AgentCiCi 并安全保存开发者身份。
+- 查看和管理组织内的智能体、技能和 MCP 服务。
+- 管理智能体与技能、知识库、工具的关联。
 - 编译、发布和导出 AgentCiCi 原生资源包。
-- 开发纯前端 AI Web 应用，集成 CloudCC 菜单、按钮或全局入口。
+- 开发 AI Web 应用，生成 CloudCC 菜单、按钮或全局入口。
 - 准备、校验和提交 AI 应用发布申请包。
 
-当前版本：`1.4.7`
+当前版本：`1.4.8`
 
-## 安装
+## 安装 Skill
 
-直接将仓库克隆到 Codex 技能目录：
+把本仓库地址发给 Codex，然后说：
 
-```bash
-mkdir -p ~/.codex/skills
-git clone https://github.com/CloudCCAI/cc-aidev-agent-guidelines-common.git \
-  ~/.codex/skills/cc-aidev-agent-guidelines-common
-```
+> 请从 https://github.com/CloudCCAI/cc-aidev-agent-guidelines-common 安装 AgentCiCi Skill。
 
-已安装时更新：
+安装后，可以显式指定 Skill：
 
-```bash
-git -C ~/.codex/skills/cc-aidev-agent-guidelines-common pull --ff-only
-```
+> 使用 $cc-aidev-agent-guidelines-common 查看当前组织的智能体。
 
-在 Codex 中可以显式调用：
+也可以直接描述 AgentCiCi 相关任务，由 Codex 自动选择本 Skill。
 
-```text
-使用 $cc-aidev-agent-guidelines-common 查看当前组织的智能体。
-```
+## 登录 AgentCiCi
 
-也可以直接描述 AgentCiCi 智能体、技能、MCP 或 AI Web 应用任务，由 Codex 自动选择本 Skill。
+1. 在 AgentCiCi 管理后台点击“复制 AI 登录信息”。
+2. 把复制的完整内容粘贴给 Codex。
+3. 告诉 Codex：
 
-## 前置条件
+> 这是 AgentCiCi 后台复制的 AI 登录信息，请帮我登录并记住登录状态。
 
-- Python 3.9 或更高版本。
-- AgentCiCi 管理后台生成的开发者登录信息。
-- 与任务匹配的最小 scope，例如 `agent.read`、`skill.write` 或 `application.submit`。
+Skill 会解析这段信息、向服务端验证，成功后再安全保存。macOS 下 Secret 保存在钥匙串中，不会写入项目文件。
 
-管理 OpenAPI 使用开发者密钥换取短期 Token。调用已发布智能体使用独立的 Agent API Key，两者不能混用。
+其他常用说法：
 
-## 登录
+> 查看我是否已经登录 AgentCiCi。
 
-在 AgentCiCi 管理后台使用“复制 AI 登录信息”，然后运行：
+> 清除这台电脑上保存的 AgentCiCi 登录信息。
 
-```bash
-python3 scripts/agentcici_auth.py login
-```
+不要把登录信息发到公开对话、工单或代码仓库。Skill 也不会在回答中回显 Secret 或 Token。
 
-粘贴后台复制的 Base64 文本。脚本会先向服务端验证，成功后才保存登录状态。macOS 下 Secret 保存在钥匙串中，不会写入项目文件。
+## 查看和管理资源
 
-```bash
-# 查看本机是否已保存登录信息
-python3 scripts/agentcici_auth.py status
+直接告诉 Codex 你想查看哪类资源：
 
-# 清除本机保存的登录信息
-python3 scripts/agentcici_auth.py logout
-```
+> 列出当前组织的所有智能体，显示 ID、名称和发布状态。
 
-不要把 Base64 原文、Client Secret 或 Token 写入命令参数、Git 文件或日志。详见 [认证与 scope](references/authentication.md)。
+> 查看这个智能体的详情，以及它关联的技能、知识库和工具。
 
-## 管理 AgentCiCi 资源
+> 列出当前组织的技能。
 
-### 智能体
+> 列出当前组织的 MCP 服务。
 
-```bash
-python3 scripts/agentcici_manage.py agents list
-python3 scripts/agentcici_manage.py agents get AGENT_ID
-python3 scripts/agentcici_manage.py agents create --file /absolute/path/agent.json
-python3 scripts/agentcici_manage.py agents update AGENT_ID --file /absolute/path/agent.json
-python3 scripts/agentcici_manage.py agents compile AGENT_ID
-python3 scripts/agentcici_manage.py agents publish AGENT_ID --version-no 1
-```
+创建或修改资源时，说明目标即可：
 
-查看和替换关联资源：
+> 创建一个用于生成客户拜访总结的智能体。先跟我确认名称、说明和需要关联的资源，再创建。
 
-```bash
-python3 scripts/agentcici_manage.py agents skills AGENT_ID
-python3 scripts/agentcici_manage.py agents bind-skills AGENT_ID --file /absolute/path/bindings.json
-python3 scripts/agentcici_manage.py agents bind-knowledge AGENT_ID --json '{"knowledgeBaseIds":[123]}'
-python3 scripts/agentcici_manage.py agents bind-tools AGENT_ID --json '{"toolIds":["query_customer"]}'
-```
+> 把“客户资料检索”技能关联到这个智能体，保留它现有的其他关联。
 
-详见 [智能体管理](references/agents.md)。
+> 更新这个 MCP 服务的说明和服务地址，其他配置保持不变。
 
-### 技能
+> 编译这个智能体；成功后把新版本号告诉我，先不发布。
 
-```bash
-python3 scripts/agentcici_manage.py skills list
-python3 scripts/agentcici_manage.py skills get SKILL_ID
-python3 scripts/agentcici_manage.py skills create --file /absolute/path/skill.json
-python3 scripts/agentcici_manage.py skills update SKILL_ID --file /absolute/path/skill.json
-python3 scripts/agentcici_manage.py skills compile SKILL_ID
-python3 scripts/agentcici_manage.py skills publish SKILL_ID --change-log '初始版本'
-```
+> 发布这个技能，变更说明是“增加客户行业判断”。
 
-详见 [技能管理](references/skills.md)。
+Skill 会在更新前先读取当前资源，保留用户没有要求修改的字段。删除操作会在执行前核对精确目标。
 
-### MCP 服务
+## 导入和导出资源包
 
-```bash
-python3 scripts/agentcici_manage.py mcp list
-python3 scripts/agentcici_manage.py mcp get SERVER_ID
-python3 scripts/agentcici_manage.py mcp create --file /absolute/path/mcp.json
-python3 scripts/agentcici_manage.py mcp update SERVER_ID --file /absolute/path/mcp.json
-```
+> 把智能体“客户助手”以 AgentCiCi 原生包导出到当前项目的 `exports` 目录。
 
-详见 [MCP 服务管理](references/mcp-tools.md)。
+> 导出技能“生日邮件生成”，不覆盖已有文件。
 
-> 更新前先读取当前资源。技能和 MCP 更新使用完整 `PUT`，应先合并原对象与已确认变更。删除命令必须同时传入匹配的 `--confirm-id`。
+> 用这个原生智能体包和这两个技能包准备一个 AI 应用发布包，先检查依赖映射，不要提交。
+
+应用包中的自定义智能体必须使用 AgentCiCi 原生导出包，不能用普通 JSON 代替。
 
 ## 开发 AI Web 应用
 
-新应用在独立目录中使用 `application.json`。最小示例：
+可以从业务目标开始：
 
-```json
-{
-  "schemaVersion": 2,
-  "appCode": "customer-summary",
-  "name": "客户摘要",
-  "version": "1.0.0",
-  "summary": "为 CloudCC 客户页面生成摘要",
-  "appType": "web",
-  "outputDir": "dist",
-  "entry": "index.html",
-  "renderer": "iframe",
-  "host": {
-    "closeBehavior": "hide",
-    "hostLayer": "content"
-  }
-}
-```
+> 开发一个“客户摘要”AI Web 应用。它在 CloudCC 里打开，使用当前登录组织的 AgentCiCi 配置。先准备可本地验证的前端和应用清单，不要提交发布申请。
 
-省略 `launchers` 时，打包器默认生成 CloudCC 脚本菜单：
+如果没有特别说明入口，Web 应用默认使用：
 
-- 触发方式：`menu`
-- 展示位置：`page-content`
-- 菜单名称：应用名称
-- 菜单内部标识：根据 `appCode` 生成
+- CloudCC 自定义脚本菜单触发。
+- 在菜单对应的内容区展示。
 
-如需全局浮点、页面按钮或其他展示位置，再显式配置 `launchers`。入口和展示容器的完整枚举见 [应用资源清单](references/application-manifest.md)。
+只在需要其他入口时额外说明：
 
-构建前端后执行：
+> 这个应用不要使用默认菜单，改为全局浮点入口，打开后默认显示在右侧。
 
-```bash
-python3 scripts/agentcici_application.py check --manifest /project/application.json
-python3 scripts/agentcici_application.py package \
-  --manifest /project/application.json \
-  --output /project/release/customer-summary-1.0.0.zip
-python3 scripts/agentcici_application.py validate \
-  /project/release/customer-summary-1.0.0.zip
-```
+> 在客户详情页增加按钮入口。先查询真实对象信息，让我选择安装范围。
 
-只有明确要求提交时才执行：
+## 准备和提交发布申请
 
-```bash
-python3 scripts/agentcici_application.py submit \
-  /project/release/customer-summary-1.0.0.zip
-```
+> 检查这个 AI 应用还缺哪些发布信息，只问我尚未确认的必填项。
 
-`submit` 只提交发布申请并尝试创建草稿，不会代替平台管理员上架。详见 [AI 应用与发布包](references/ai-applications.md) 和 [Web 应用开发规范](references/web-app-development.md)。
+> 构建并校验这个 AI 应用的发布申请包。完成后告诉我实际清单和产物路径，不要上传。
 
-## 导出原生资源包
+> 把刚才校验通过的发布申请包提交到 AgentCiCi，然后返回申请 ID 和状态。
 
-```bash
-python3 scripts/agentcici_manage.py agents export AGENT_ID \
-  --output exports/assistant.ciciagent
-python3 scripts/agentcici_manage.py skills export SKILL_ID \
-  --output exports/skill.zip
-```
+“准备发布包”不等于“上传”，“上传申请”也不等于“平台上架”。平台上架仍由平台管理员执行。
 
-导出命令不覆盖已有文件。应用包中的自定义智能体必须使用原生导出包，不能用 CRUD JSON 伪造。详见 [资源包规范](references/resource-packages.md)。
+## 调用已发布智能体
 
-## 仓库结构
+> 使用这个 Agent API Key 调用已发布的“客户助手”，发送消息“总结今天的客户跟进”。不要把 Key 写入项目文件。
 
-```text
-.
-├── SKILL.md                     # Codex 技能入口与核心约束
-├── agents/openai.yaml           # Codex 展示与调用配置
-├── assets/                     # Web 应用入口模板
-├── references/                 # 按模块加载的详细规范
-└── scripts/                    # 认证、资源管理、应用打包与测试
-```
+调用已发布智能体使用 Agent API Key；管理智能体、技能、MCP 和应用使用开发者登录信息。两类凭据不能混用。
 
-## 本地验证
+## Skill 的操作原则
 
-```bash
-python3 -m unittest discover -s scripts -p 'test_*.py' -v
-python3 /path/to/skill-creator/scripts/quick_validate.py .
-git diff --check
-```
+- 查看、分析或设计时，不会擅自修改平台资源。
+- 修改前先读取当前资源，只更改用户已确认的内容。
+- 不擅自绑定知识库、技能、工具、渠道或凭据。
+- 删除前确认精确目标，并检查引用约束。
+- 不在回答、日志、URL 或项目文件中暴露凭据。
+- Web 应用默认创建 CloudCC 连接应用；只有用户明确说明不需要时才关闭。
+- 发布前区分本地校验、申请提交、草稿创建和平台上架。
 
-## 更多资料
+## 详细规范
+
+README 只提供对话式使用入口。Skill 会在执行任务时按需读取以下规范：
 
 - [Skill 完整工作流](SKILL.md)
+- [认证、scope 与错误语义](references/authentication.md)
+- [智能体管理](references/agents.md)
+- [技能管理](references/skills.md)
+- [MCP 服务管理](references/mcp-tools.md)
 - [智能体运行 OpenAPI](references/agent-runtime-openapi.md)
-- [应用存储与版本清理](references/application-storage.md)
+- [AI 应用与发布申请包](references/ai-applications.md)
+- [应用资源清单](references/application-manifest.md)
+- [Web 应用开发规范](references/web-app-development.md)
+- [原生资源包](references/resource-packages.md)
 
 ## License
 
