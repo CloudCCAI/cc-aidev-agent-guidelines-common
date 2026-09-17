@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentCiCi 开发与管理 Skill</title>
+  <style>
+    :root { color-scheme: light dark; --accent:#7c5c17; --panel:#f5f3ed; --border:#d7d1c3; }
+    @media (prefers-color-scheme: dark) { :root { --accent:#d7b968; --panel:#211f1a; --border:#4a4539; } }
+    body { margin:0; font:16px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:920px; margin:auto; padding:40px 24px 80px; }
+    h1,h2,h3 { line-height:1.25; }
+    h2 { margin-top:2.2em; padding-bottom:.35em; border-bottom:1px solid var(--border); }
+    a { color:var(--accent); }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    pre { overflow:auto; padding:16px; border:1px solid var(--border); border-radius:10px; background:var(--panel); }
+    .summary,.notice { padding:18px 20px; border:1px solid var(--border); border-radius:12px; background:var(--panel); }
+    .summary strong { color:var(--accent); }
+    nav ul { columns:2; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:10px; border:1px solid var(--border); text-align:left; vertical-align:top; }
+    @media (max-width:640px) { nav ul { columns:1; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>AgentCiCi 开发与管理 Skill</h1>
+  <section class="summary">
+    <strong>阅读摘要</strong>
+    <p>本 Skill 用于管理 AgentCiCi 智能体、技能和 MCP，以及开发、打包和提交 AI Web 应用。当前版本为 <code>1.4.7</code>。管理操作使用开发者密钥，调用已发布智能体使用独立 Agent API Key。Web 应用省略 launchers 时默认生成菜单入口并在内容区展示。</p>
+  </section>
+
+  <nav aria-label="目录"><h2>目录</h2><ul>
+    <li><a href="#install">安装与调用</a></li><li><a href="#login">登录</a></li>
+    <li><a href="#resources">资源管理</a></li><li><a href="#web">AI Web 应用</a></li>
+    <li><a href="#packages">资源包</a></li><li><a href="#verify">本地验证</a></li>
+  </ul></nav>
+
+  <h2 id="install">安装与调用</h2>
+  <pre><code>mkdir -p ~/.codex/skills
+git clone https://github.com/CloudCCAI/cc-aidev-agent-guidelines-common.git \
+  ~/.codex/skills/cc-aidev-agent-guidelines-common</code></pre>
+  <p>更新已安装技能：</p>
+  <pre><code>git -C ~/.codex/skills/cc-aidev-agent-guidelines-common pull --ff-only</code></pre>
+  <p>在 Codex 中输入：<code>使用 $cc-aidev-agent-guidelines-common 查看当前组织的智能体。</code></p>
+  <p>需要 Python 3.9+、AgentCiCi 开发者登录信息及与任务匹配的最小 scope。</p>
+
+  <h2 id="login">登录</h2>
+  <pre><code>python3 scripts/agentcici_auth.py login
+python3 scripts/agentcici_auth.py status
+python3 scripts/agentcici_auth.py logout</code></pre>
+  <div class="notice">使用管理后台“复制 AI 登录信息”得到的 Base64 文本登录。不要把 Base64 原文、Secret 或 Token 写入命令参数、Git 文件或日志。</div>
+
+  <h2 id="resources">资源管理</h2>
+  <h3>智能体</h3>
+  <pre><code>python3 scripts/agentcici_manage.py agents list
+python3 scripts/agentcici_manage.py agents get AGENT_ID
+python3 scripts/agentcici_manage.py agents create --file /absolute/path/agent.json
+python3 scripts/agentcici_manage.py agents update AGENT_ID --file /absolute/path/agent.json
+python3 scripts/agentcici_manage.py agents compile AGENT_ID
+python3 scripts/agentcici_manage.py agents publish AGENT_ID --version-no 1</code></pre>
+  <h3>技能</h3>
+  <pre><code>python3 scripts/agentcici_manage.py skills list
+python3 scripts/agentcici_manage.py skills create --file /absolute/path/skill.json
+python3 scripts/agentcici_manage.py skills compile SKILL_ID
+python3 scripts/agentcici_manage.py skills publish SKILL_ID --change-log '初始版本'</code></pre>
+  <h3>MCP 服务</h3>
+  <pre><code>python3 scripts/agentcici_manage.py mcp list
+python3 scripts/agentcici_manage.py mcp create --file /absolute/path/mcp.json
+python3 scripts/agentcici_manage.py mcp update SERVER_ID --file /absolute/path/mcp.json</code></pre>
+  <p>更新前必须先读取当前资源；技能和 MCP 更新使用完整 <code>PUT</code>。删除时必须传入匹配的 <code>--confirm-id</code>。</p>
+
+  <h2 id="web">AI Web 应用</h2>
+  <p>应用使用 <code>schemaVersion: 2</code> 的 <code>application.json</code>。最小核心字段包括 appCode、name、version、summary、appType、outputDir、entry、renderer 和 host。</p>
+  <p>未配置 <code>launchers</code> 时，默认使用 <code>menu</code> 触发和 <code>page-content</code> 展示。</p>
+  <pre><code>python3 scripts/agentcici_application.py check --manifest /project/application.json
+python3 scripts/agentcici_application.py package \
+  --manifest /project/application.json \
+  --output /project/release/app-1.0.0.zip
+python3 scripts/agentcici_application.py validate /project/release/app-1.0.0.zip</code></pre>
+  <p>仅在明确需要提交时执行：</p>
+  <pre><code>python3 scripts/agentcici_application.py submit /project/release/app-1.0.0.zip</code></pre>
+  <p><code>submit</code> 不会代替平台管理员上架。</p>
+
+  <h2 id="packages">导出原生资源包</h2>
+  <pre><code>python3 scripts/agentcici_manage.py agents export AGENT_ID --output exports/assistant.ciciagent
+python3 scripts/agentcici_manage.py skills export SKILL_ID --output exports/skill.zip</code></pre>
+  <p>导出不覆盖已有文件。自定义智能体必须使用原生导出包，不能用 CRUD JSON 伪造。</p>
+
+  <h2 id="verify">本地验证</h2>
+  <pre><code>python3 -m unittest discover -s scripts -p 'test_*.py' -v
+python3 /path/to/skill-creator/scripts/quick_validate.py .
+git diff --check</code></pre>
+
+  <h2>详细文档</h2>
+  <ul>
+    <li><a href="SKILL.md">Skill 完整工作流</a></li>
+    <li><a href="references/authentication.md">认证与 scope</a></li>
+    <li><a href="references/agents.md">智能体管理</a></li>
+    <li><a href="references/skills.md">技能管理</a></li>
+    <li><a href="references/mcp-tools.md">MCP 服务管理</a></li>
+    <li><a href="references/application-manifest.md">应用资源清单</a></li>
+    <li><a href="references/web-app-development.md">Web 应用开发规范</a></li>
+  </ul>
+  <h2>License</h2>
+  <p>本仓库尚未声明开源许可证。在复制、分发或修改前，请先向 CloudCCAI 确认授权范围。</p>
+</main>
+</body>
+</html>
