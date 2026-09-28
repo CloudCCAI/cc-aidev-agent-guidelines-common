@@ -16,6 +16,15 @@ def encoded(secret="test'中文$HOME"):
 
 
 class AuthTest(unittest.TestCase):
+    def test_named_login_profile_keeps_default_path(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(auth.config_path().name, 'login.json')
+        with patch.dict(os.environ, {'AGENTCICI_LOGIN_PROFILE': 'prod'}, clear=True):
+            self.assertEqual(auth.config_path().name, 'login-prod.json')
+        with patch.dict(os.environ, {'AGENTCICI_LOGIN_PROFILE': '../prod'}, clear=True):
+            with self.assertRaises(RuntimeError):
+                auth.config_path()
+
     def test_decode_without_shell_execution(self):
         self.assertEqual(auth.decode_login(encoded())[auth.NAMES[2]], "test'中文$HOME")
 

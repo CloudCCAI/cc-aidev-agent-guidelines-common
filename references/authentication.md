@@ -43,4 +43,6 @@ Content-Type: application/json
 
 status 不读取或显示 Secret，只报告保存状态。logout 删除钥匙串项和配置，不撤销远程凭据；如果仍设置三项环境变量，命令仍会使用环境变量。钥匙串被锁定/授权拒绝时明确报错，不回退到明文文件。服务端停用/轮换密钥后，重新复制并 login；应用命令发起远程写入失败后不要自动重试以掩盖鉴权错误。
 
+需要同时保存多个环境时，默认登录仍使用 `login.json`；设置 `AGENTCICI_LOGIN_PROFILE=prod` 后，登录、状态和管理命令使用独立的 `login-prod.json`。Secret 仍保存在同一个 macOS 登录钥匙串，配置文件只保存钥匙串引用。环境名称仅允许字母、数字、下划线和连字符。
+
 管理命令与应用 submit/status 共享此登录读取逻辑；本地 package/validate 不需要登录。Base64 是编码，不改变这些数据作为凭据的处理方式。

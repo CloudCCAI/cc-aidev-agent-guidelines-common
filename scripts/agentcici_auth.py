@@ -7,6 +7,7 @@ import getpass
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -19,7 +20,11 @@ SERVICE = 'AgentCiCi Developer Login'
 
 
 def config_path():
-    return Path.home() / '.config' / 'agentcici' / 'login.json'
+    profile = os.environ.get('AGENTCICI_LOGIN_PROFILE', '')
+    if profile and not re.fullmatch(r'[A-Za-z0-9_-]+', profile):
+        raise RuntimeError('登录环境名称只能包含字母、数字、下划线和连字符')
+    filename = f'login-{profile}.json' if profile else 'login.json'
+    return Path.home() / '.config' / 'agentcici' / filename
 
 
 def decode_login(encoded):
