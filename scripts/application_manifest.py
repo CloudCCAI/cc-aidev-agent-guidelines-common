@@ -112,7 +112,9 @@ def compile_manifest(config, root):
             result['knowledgeBases'] = agent.get('knowledges', [])
             result['agents'] = [{'ref': agent['ref'], 'file': agent['file'],
                 'skillBindings': {s['bindingRef']: s['ref'] for s in result['skills']},
-                'knowledgeBindings': {k['bindingRef']: k['ref'] for k in result['knowledgeBases']}}]
+                'managedSkillBindings': {s['bindingRef']: s['skillCode'] for s in agent.get('managedSkills', [])},
+                'knowledgeBindings': {k['bindingRef']: k['ref'] for k in result['knowledgeBases']},
+                'toolBindings': {t['bindingRef']: t['ref'] for t in agent.get('tools', [])}}]
         else: raise ValueError('智能体类型只能是platform/custom')
     steps, ids, triggers = [], set(), set()
     for launcher in sorted(config['launchers'], key=lambda item: item.get('order', 0)):
@@ -173,5 +175,7 @@ def compile_manifest(config, root):
                     'launchers': [{k: value for k, value in launcher.items() if k in ('id', 'name', 'icon', 'trigger', 'positions', 'objects', 'order')}
                                   for launcher in config['launchers']]}
     if agent: installation['agentRuntime'] = {'agentId': agent['ref'], 'keyType': key_type}
+    if 'mcpServers' in config: installation['mcpServers'] = copy.deepcopy(config['mcpServers'])
+    if 'tools' in config: installation['tools'] = copy.deepcopy(config['tools'])
     result['installationManifest'] = installation
     return result

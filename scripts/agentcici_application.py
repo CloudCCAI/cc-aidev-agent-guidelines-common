@@ -156,11 +156,19 @@ def validate(files):
                 and am.get('snapshot') == 'SAVED_DRAFT', '智能体需为原生导出包')
         require(am.get('sha256') == digest(package['agent.json']), '智能体包摘要错误')
         payload = json.loads(package['agent.json'])
-        require(not payload.get('tools') and not payload.get('agentToolRefs'), '本期不支持工具依赖打包')
-        for field, dependencies, targets in [('skillBindings', 'skills', skills), ('knowledgeBindings', 'knowledge', knowledge)]:
+        tool_targets = {item['ref']: item for item in manifest.get('installationManifest', {}).get('tools', [])}
+        custom_skills = [d for d in payload.get('skills', []) if d.get('kind', 'CUSTOM') == 'CUSTOM']
+        managed_skills = [d for d in payload.get('skills', []) if d.get('kind') == 'MANAGED']
+        require(set(agent.get('skillBindings', {})) == {d['ref'] for d in custom_skills}, '自定义技能未完整映射')
+        require(all(v in skills for v in agent.get('skillBindings', {}).values()), '自定义技能目标不存在')
+        require(set(agent.get('managedSkillBindings', {})) == {d['ref'] for d in managed_skills}, '受管技能未完整映射')
+        require(all(agent['managedSkillBindings'][d['ref']] == d['sourceCode'] for d in managed_skills), '受管技能代码不匹配')
+        for field, dependencies, targets in [('knowledgeBindings', 'knowledge', knowledge), ('toolBindings', 'tools', tool_targets)]:
             bindings = agent.get(field, {})
             require(set(bindings) == {d['ref'] for d in payload.get(dependencies, [])}, f'{field} 未完整映射')
             require(all(v in targets for v in bindings.values()), f'{field} 目标不存在')
+            if field == 'toolBindings':
+                require(all(tool_targets[bindings[d['ref']]]['name'] == d['name'] for d in payload.get('tools', [])), '工具名称与依赖不一致')
     require(set(files) == expected, '包含未声明文件')
     if 'cloudcc/menu.json' in files:
         menu = json.loads(files['cloudcc/menu.json'])
@@ -211,7 +219,7 @@ def package(source, output):
             files[name] = path.read_bytes()
             entry = {'ref': ref, 'file': name}
             if kind == 'agents':
-                entry.update(skillBindings=item.get('skillBindings', {}), knowledgeBindings=item.get('knowledgeBindings', {}))
+                entry.update(skillBindings=item.get('skillBindings', {}), managedSkillBindings=item.get('managedSkillBindings', {}), knowledgeBindings=item.get('knowledgeBindings', {}), toolBindings=item.get('toolBindings', {}))
             manifest[kind].append(entry)
     if 'menu' in config:
         menu = config['menu']

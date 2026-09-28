@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.4.8"
-description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP；指导纯前端 AI 应用开发、CloudCC 站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
+  version: "1.4.9"
+description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导纯前端 AI 应用开发、CloudCC 站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.4.8`。
+当前技能版本：`1.4.9`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -65,7 +65,7 @@ script.src = url.href;
 - 智能体设计、CRUD、关联资源或编译发布：先读 [references/agents.md](references/agents.md)，实施时运行 `scripts/agentcici_manage.py agents ...`。
 - 调用已发布智能体：读 [references/agent-runtime-openapi.md](references/agent-runtime-openapi.md)。这套运行 API 使用 Agent API Key，不使用开发者密钥。
 - 技能设计、CRUD 或编译发布：先读 [references/skills.md](references/skills.md)，实施时运行 `scripts/agentcici_manage.py skills ...`。
-- MCP 服务设计或 CRUD：先读 [references/mcp-tools.md](references/mcp-tools.md)，实施时运行 `scripts/agentcici_manage.py mcp ...`。
+- MCP 服务设计、CRUD、工具发现与组织现有工具读取：先读 [references/mcp-tools.md](references/mcp-tools.md)，实施时运行 `scripts/agentcici_manage.py mcp ...` 或 `tools list`；工具只能读取并关联智能体，不单独创建。
 - 换票、scope、错误语义：读 [references/authentication.md](references/authentication.md)。
 
 只读取当前任务所需的参考文件。
@@ -98,6 +98,10 @@ python3 scripts/agentcici_manage.py skills update SKILL_ID --file /absolute/path
 python3 scripts/agentcici_manage.py mcp list
 python3 scripts/agentcici_manage.py mcp create --file /absolute/path/mcp.json
 python3 scripts/agentcici_manage.py mcp update SERVER_ID --file /absolute/path/mcp.json
+python3 scripts/agentcici_manage.py mcp discover SERVER_ID
+python3 scripts/agentcici_manage.py mcp tools SERVER_ID
+python3 scripts/agentcici_manage.py tools list
+python3 scripts/agentcici_manage.py agents bind-tools AGENT_ID --file /absolute/path/binding.json
 ```
 
 长数据优先使用 `--file`，减少 shell 转义和敏感内容进入终端历史的风险。

@@ -15,6 +15,30 @@ class ManagementTests(unittest.TestCase):
         client.request.assert_called_with('PUT', '/openapi/v1/management/skills/9',
             {'skillCode': 'birthday', 'name': 'New', 'runtimeApis': [], 'enabled': True})
 
+    def test_mcp_update_preserves_other_fields(self):
+        client = Mock()
+        client.request.return_value = {'id': 3, 'name': 'Existing', 'url': 'https://example.com/mcp',
+                                       'transportType': 'streamableHttp', 'enabled': True,
+                                       'clientSecretConfigured': True}
+        self.run_command('mcp', 'update', '3', '--json', '{"name":"New"}', client=client)
+        client.request.assert_called_with('PUT', '/openapi/v1/management/mcp-servers/3',
+            {'name': 'New', 'url': 'https://example.com/mcp', 'transportType': 'streamableHttp', 'enabled': True})
+
+    def test_mcp_tool_discovery_and_cached_read(self):
+        c = self.run_command('mcp', 'discover', '3')
+        c.request.assert_called_once_with('POST', '/openapi/v1/management/mcp-servers/3/discover')
+        c = self.run_command('mcp', 'tools', '3')
+        c.request.assert_called_once_with('GET', '/openapi/v1/management/mcp-servers/3/tools')
+
+    def test_existing_tool_catalog_is_read_only(self):
+        import contextlib
+        import io
+        c = self.run_command('tools', 'list')
+        c.request.assert_called_once_with('GET', '/openapi/v1/management/tools')
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parser().parse_args(('tools', 'create'))
+
     def test_compile_and_publish_use_explicit_version(self):
         c = self.run_command('agents', 'publish', 'a', '--version-no', '7')
         c.request.assert_called_once_with('POST', '/openapi/v1/management/agents/a/publish', {'versionNo': 7})

@@ -133,6 +133,10 @@ def add_resource_commands(module: argparse.ArgumentParser, id_name: str) -> None
             binding = commands.add_parser(name, help="替换完整关联列表；空列表清空")
             binding.add_argument(id_name)
             add_payload_arguments(binding)
+    if module.prog.endswith("mcp"):
+        for name in ("tools", "discover"):
+            command = commands.add_parser(name, help="读取已有工具" if name == "tools" else "从 MCP 服务重新发现工具")
+            command.add_argument(id_name)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -141,6 +145,7 @@ def parser() -> argparse.ArgumentParser:
     add_resource_commands(modules.add_parser("agents", help="管理智能体"), "resource_id")
     add_resource_commands(modules.add_parser("skills", help="管理技能"), "resource_id")
     add_resource_commands(modules.add_parser("mcp", help="管理 MCP 服务"), "resource_id")
+    modules.add_parser("tools", help="读取组织现有工具，不创建工具").add_subparsers(dest="command", required=True).add_parser("list")
     return root
 
 
@@ -150,22 +155,30 @@ def resource_path(module: str) -> str:
 
 
 SKILL_FIELDS = "skillCode name description enabled promptFragment draftSpecText toolWhitelist kbWhitelist handoffRule outputContract runtimeApis riskLevel changeLog".split()
+MCP_FIELDS = "name description transportType url headers timeoutSeconds enabled authType tokenUrl clientId clientSecret tokenAudience tokenScopes".split()
 
 
 def execute(client, args):
+    if args.module == "tools":
+        return client.request("GET", "/openapi/v1/management/tools")
     base = resource_path(args.module)
     path = base + "/" + urllib.parse.quote(getattr(args, "resource_id", ""), safe="")
     if args.command == "list":
         return client.request("GET", base)
     if args.command == "get":
         return client.request("GET", path)
+    if args.command == "tools":
+        return client.request("GET", path + "/tools")
+    if args.command == "discover":
+        return client.request("POST", path + "/discover")
     if args.command == "create":
         return client.request("POST", base, read_payload(args))
     if args.command == "update":
         body = read_payload(args)
-        if args.module == "skills":
+        if args.module in ("skills", "mcp"):
             current = client.request("GET", path)
-            body = {**{k: v for k, v in current.items() if k in SKILL_FIELDS}, **body}
+            fields = SKILL_FIELDS if args.module == "skills" else MCP_FIELDS
+            body = {**{k: v for k, v in current.items() if k in fields}, **body}
         return client.request("PATCH" if args.module == "agents" else "PUT", path, body)
     if args.command == "export":
         output = pathlib.Path(args.output).expanduser().resolve()
