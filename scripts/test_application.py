@@ -144,7 +144,7 @@ class ResourceManifestTest(unittest.TestCase):
         self.assertEqual(install['agentRuntime']['agentId'], 'cici-system')
         self.assertEqual(install['agentRuntime']['keyType'], 'cloudcc')
         script = install['steps'][0]['payload']['scriptContent']
-        self.assertIn('AgentCiCiApp.start({ appCode })', script)
+        self.assertIn('AgentCiCiApp.start({ appCode, launcherId: "sisi_launcher" })', script)
         self.assertNotIn('name:', script)
         self.assertNotIn('position:', script)
         self.assertEqual(install['application']['name'], '思思')
@@ -181,13 +181,15 @@ class ResourceManifestTest(unittest.TestCase):
         del self.config['launchers']
         self.assertNotIn('launchers', self.compiler.missing(self.config))
         install = app.validate(self.build())['installationManifest']
-        self.assertEqual(install['launchers'], [{
+        self.assertEqual(len(install['launchers']), 1)
+        self.assertEqual({k: install['launchers'][0][k] for k in ('id', 'name', 'trigger', 'positions')}, {
             'id': 'default-menu', 'name': '思思', 'trigger': 'menu', 'positions': ['page-content']
-        }])
+        })
+        self.assertEqual(install['launchers'][0]['renderConfig']['positions'], ['home'])
         self.assertEqual(install['renderConfig']['positions'], ['home'])
         self.assertEqual(install['steps'][0]['type'], 'menu')
         self.assertEqual(install['steps'][0]['payload']['pname'], 'sisi')
-        self.assertIn('AgentCiCiApp.mount({ appCode })', install['steps'][0]['payload']['functioncode'])
+        self.assertIn('AgentCiCiApp.mount({ appCode, launcherId: "default-menu" })', install['steps'][0]['payload']['functioncode'])
 
     def test_explicit_empty_launchers_remain_invalid(self):
         self.config['launchers'] = []
@@ -216,9 +218,34 @@ class ResourceManifestTest(unittest.TestCase):
                 'tpSysButtonVO': {'btnType': 'detailBtn', 'category': 'CustomButton', 'functioncode': 'obsolete'}})
         step = app.validate(self.build())['installationManifest']['steps'][0]
         button = step['payload']['tpSysButtonVO']
-        self.assertIn('AgentCiCiApp.mount({ appCode })', button['functionCode'])
+        self.assertIn('AgentCiCiApp.mount({ appCode, launcherId: "sisi_launcher" })', button['functionCode'])
         self.assertNotIn('functioncode', button)
+        self.assertEqual(step['payload']['objid'], 'account')
         self.assertEqual(step['placement'], 'allObjectDetailLayouts')
+
+    def test_four_layer_rejects_position_outside_trigger(self):
+        self.config['layoutVersion'] = 2
+        self.config['launchers'][0]['positions'] = ['detail-right']
+        with self.assertRaisesRegex(ValueError, '位置与入口类型不匹配'): self.build()
+
+    def test_four_layer_requires_entry_when_renderer_changes(self):
+        self.config['layoutVersion'] = 2
+        self.config['launchers'][0]['renderer'] = 'iframe'
+        with self.assertRaisesRegex(ValueError, '独立加载地址'): self.build()
+        self.config['launchers'][0]['entry'] = 'index.html'
+        launcher = app.validate(self.build())['installationManifest']['launchers'][0]
+        self.assertEqual(launcher['renderConfig']['renderer'], 'iframe')
+        self.assertEqual(launcher['renderConfig']['entryPath'], 'index.html')
+
+    def test_four_layer_list_button_keeps_supplied_object(self):
+        self.config['layoutVersion'] = 2
+        self.config['launchers'][0].update(trigger='list-button', positions=['list-right'], objects=['Opportunity'],
+            payload={'objid': 'opportunity', 'tpSysButtonVO': {'btnType': 'listBtn', 'category': 'CustomButton', 'event': 'lightning-script'}})
+        install = app.validate(self.build())['installationManifest']
+        self.assertEqual(install['steps'][0]['payload']['objid'], 'opportunity')
+        self.assertEqual(install['launchers'][0]['objects'], ['Opportunity'])
+        self.assertIn('launcherId: "sisi_launcher"', install['steps'][0]['payload']['tpSysButtonVO']['functionCode'])
+        self.assertEqual(install['launchers'][0]['renderConfig']['positions'], ['list-right'])
 
     def test_page_trigger_requires_customer_object_selection(self):
         self.config['launchers'][0]['trigger'] = 'detail-button'

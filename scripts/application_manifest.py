@@ -10,6 +10,9 @@ POSITIONS = {'global-floating': 'float', 'global-right': 'right', 'detail-right'
              'list-right': 'list-right', 'dialog': 'dialog', 'page-content': 'home', 'fullscreen': 'fullscreen'}
 TRIGGERS = {'global-floating': 'clientScript', 'create-button': 'clientScript',
             'edit-button': 'clientScript', 'menu': 'menu', 'detail-button': 'button', 'list-button': 'button'}
+TRIGGER_POSITIONS = {'global-floating': {'global-floating', 'global-right', 'fullscreen'},
+                     'create-button': {'dialog'}, 'edit-button': {'dialog'}, 'menu': {'page-content'},
+                     'detail-button': {'detail-right'}, 'list-button': {'list-right'}}
 
 
 def default_launchers(config):
@@ -22,6 +25,56 @@ def default_launchers(config):
         pname = f'{pname[:13]}_{hashlib.sha256(app_code.encode()).hexdigest()[:6]}'
     return [{'id': 'default-menu', 'name': name, 'trigger': 'menu',
              'positions': ['page-content'], 'payload': {'pname': pname}}]
+
+
+def lifecycle_button_script(app_code, launcher_id, name):
+    return """(async function () {
+  const appCode = %s;
+  const launcherId = %s;
+  const formId = obj?.formId;
+  if (!formId) return;
+  if (!window.AgentCiCiApp) {
+    window.__agentCiCiAppSdkLoad ||= new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      const url = new URL('__AGENTCICI_SDK_URL__', document.baseURI);
+      url.searchParams.set('_t', new Date().getTime());
+      script.src = url.href;
+      script.onload = () => { script.remove(); resolve(); };
+      script.onerror = () => { script.remove(); delete window.__agentCiCiAppSdkLoad; reject(new Error('AI 应用 SDK 加载失败，请重试。')); };
+      document.head.append(script);
+    });
+    await window.__agentCiCiAppSdkLoad;
+  }
+  const footers = document.querySelectorAll('[devid="footerButton"]');
+  if (footers.length > 1) throw new Error('当前存在多个表单，请先确认当前表单的按钮容器。');
+  const footer = footers[0];
+  if (!footer) throw new Error('未找到当前表单的底部按钮区域，请在表单加载完成事件执行。');
+  const existing = footer.querySelector('[data-agentcici-launcher="' + launcherId + '"]');
+  if (existing?.dataset.formId === String(formId)) return;
+  existing?.remove();
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.agentciciLauncher = launcherId;
+  button.dataset.formId = String(formId);
+  button.textContent = %s;
+  button.style.cssText = 'background:#2d6cfc;color:white;border:0;border-radius:4px;padding:6px 8px;cursor:pointer;margin-left:10px;font-size:12px';
+  let instance;
+  button.onclick = async () => {
+    button.disabled = true;
+    try {
+      instance = window.AgentCiCiApp.mount({ appCode, launcherId, launchContext: { formId } });
+      await instance.ready;
+    } catch (error) { window.alert(error.message || '应用打开失败。'); }
+    finally { button.disabled = false; }
+  };
+  footer.append(button);
+  const observer = new MutationObserver(() => {
+    if (!button.isConnected) { observer.disconnect(); instance?.destroy(); }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+})().catch(error => window.alert(error.message || '应用入口加载失败。'));""" % (
+        json.dumps(app_code, ensure_ascii=False), json.dumps(launcher_id, ensure_ascii=False),
+        json.dumps(name, ensure_ascii=False))
 
 
 def missing(config):
@@ -59,6 +112,8 @@ def compile_manifest(config, root):
         config['launchers'] = default_launchers(config)
     if config.get('schemaVersion') != 2 or config['appType'] != 'web':
         raise ValueError('源清单需要 schemaVersion=2、appType=web')
+    if 'layoutVersion' in config and config['layoutVersion'] != 2:
+        raise ValueError('layoutVersion 只支持 2')
     if not re.fullmatch(r'[0-9]\.[0-9]\.[0-9]', config['version']):
         raise ValueError('版本需要三位0–9数字，逢9进位')
     renderer = config['renderer']
@@ -122,13 +177,14 @@ def compile_manifest(config, root):
         if not re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_-]{0,63}', key) or key in ids: raise ValueError('入口id无效或重复')
         ids.add(key)
         if trigger not in TRIGGERS: raise ValueError('触发方式无效')
+        if launcher.get('sisiShortcut') and trigger != 'menu': raise ValueError('思思快捷入口只支持脚本菜单')
         if trigger in triggers: raise ValueError('同一应用每种trigger只能配置一项')
         triggers.add(trigger)
-        if trigger in ('create-button', 'edit-button') and not launcher.get('file'):
-            raise ValueError('新建/编辑页底部按钮需提供已对接CRM页生命周期的业务脚本file，不能在页面加载时直接打开应用')
         positions = launcher['positions']
         if not isinstance(positions, list) or not positions or any(not isinstance(p, str) or p not in POSITIONS for p in positions) or len(set(positions)) != len(positions):
             raise ValueError('展示位置无效')
+        if config.get('layoutVersion') == 2 and any(position not in TRIGGER_POSITIONS[trigger] for position in positions):
+            raise ValueError('展示位置与入口类型不匹配')
         for position in positions:
             if POSITIONS[position] not in render['positions']: render['positions'].append(POSITIONS[position])
         # The bootstrap contains only the application identity. Display metadata lives in the manifest.
@@ -148,12 +204,14 @@ def compile_manifest(config, root):
     });
     await window.__agentCiCiAppSdkLoad;
   }
-  await window.AgentCiCiApp.%s({ appCode });
-})().catch(error => window.alert(error.message || '应用打开失败。'));""" % (json.dumps(config['appCode'], ensure_ascii=False), method)
+  await window.AgentCiCiApp.%s({ appCode, launcherId: %s });
+})().catch(error => window.alert(error.message || '应用打开失败。'));""" % (json.dumps(config['appCode'], ensure_ascii=False), method, json.dumps(key, ensure_ascii=False))
         if launcher.get('file'):
             file = root / launcher['file']
             if file.is_symlink() or not file.resolve().is_relative_to(root): raise ValueError('脚本必须位于应用目录内')
             script = file.read_text(encoding='utf-8')
+        elif trigger in ('create-button', 'edit-button'):
+            script = lifecycle_button_script(config['appCode'], key, launcher['name'])
         payload = copy.deepcopy(launcher['payload'])
         kind = TRIGGERS[trigger]
         if trigger in ('create-button', 'edit-button', 'detail-button', 'list-button') and not launcher.get('objects'):
@@ -165,15 +223,44 @@ def compile_manifest(config, root):
         else:
             if not payload.get('objid') or not isinstance(payload.get('tpSysButtonVO'), dict):
                 raise ValueError('按钮需要查询确认的objid和tpSysButtonVO')
+            if config.get('layoutVersion') == 2:
+                expected_type = 'detailBtn' if trigger == 'detail-button' else 'listBtn'
+                if payload['tpSysButtonVO'].get('btnType') != expected_type:
+                    raise ValueError('按钮类型与触发入口不匹配')
             payload['tpSysButtonVO'].pop('functioncode', None)
             payload['tpSysButtonVO']['functionCode'] = script
+        if config.get('layoutVersion') == 2 and launcher.get('placement') and (trigger != 'detail-button' or launcher['placement'] != 'allObjectDetailLayouts'):
+            raise ValueError('布局分配仅支持详情页按钮的 allObjectDetailLayouts')
         step = {'key': key, 'type': kind, 'label': launcher['name'], 'payload': payload}
         if launcher.get('placement'): step['placement'] = launcher['placement']
         steps.append(step)
+        launcher_render = copy.deepcopy(render)
+        launcher_render['positions'] = [POSITIONS[position] for position in positions]
+        if 'renderer' in launcher:
+            if launcher['renderer'] not in ('iframe', 'shadow-dom'): raise ValueError('入口渲染方式无效')
+            launcher_render['renderer'] = launcher['renderer']
+            if launcher['renderer'] != renderer and not launcher.get('entry'):
+                raise ValueError('入口渲染方式与应用不同时需要独立加载地址')
+        if 'entry' in launcher:
+            launcher_entry = launcher['entry']
+            if not isinstance(launcher_entry, str) or not launcher_entry: raise ValueError('入口加载地址无效')
+            launcher_render.pop('entryUrl', None)
+            launcher_render.pop('entryPath', None)
+            launcher_url = urlsplit(launcher_entry)
+            if launcher_url.scheme:
+                if launcher_url.scheme not in ('http', 'https') or not launcher_url.hostname or launcher_url.username or launcher_url.password:
+                    raise ValueError('入口加载地址必须为无凭据的HTTP(S)地址')
+                launcher_render['entryUrl'] = launcher_entry
+            elif re.fullmatch(r'[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*(?:\.[A-Za-z0-9_-]+)+', launcher_entry):
+                launcher_render['entryPath'] = launcher_entry
+            else:
+                raise ValueError('入口包内加载路径无效')
+        launcher['renderConfig'] = launcher_render
     installation = {'schemaVersion': 1, 'steps': steps, 'requiresConnectedApplication': config.get('connectedApplications', True), 'renderConfig': render,
                     'application': {k: config[k] for k in ('appCode', 'name', 'summary')},
-                    'launchers': [{k: value for k, value in launcher.items() if k in ('id', 'name', 'icon', 'trigger', 'positions', 'objects', 'order')}
+                    'launchers': [{k: value for k, value in launcher.items() if k in ('id', 'name', 'icon', 'trigger', 'positions', 'objects', 'order', 'renderConfig', 'sisiShortcut')}
                                   for launcher in config['launchers']]}
+    if config.get('layoutVersion') == 2: installation['layoutVersion'] = 2
     if agent: installation['agentRuntime'] = {'agentId': agent['ref'], 'keyType': key_type}
     if 'mcpServers' in config: installation['mcpServers'] = copy.deepcopy(config['mcpServers'])
     if 'tools' in config: installation['tools'] = copy.deepcopy(config['tools'])

@@ -84,7 +84,7 @@ client.destroy();
 
 平台发布版本时将 Web ZIP 解压到共享 aiapp 目录，访问路径为 `/aiapp/{appCode}/{version}/{sha256}/index.html`。多 Web 包分别生成路径；安装清单 webApps 保存站点路径，setup 安装记录保存后，runtime 返回 webApps 和默认 webUrl（第一项）。旧安装需升级/重装，不能猜测地址代替 runtime 配置。
 
-打包工具默认使用 assets/application-menu.js 短加载器，加载 agentcici-app.js 后执行 AgentCiCiApp.mount({appCode})。SDK 负责 CCDK 登录身份、runtime、连接应用换票、iframe 与初始化消息。menu.sdkUrl 可覆盖 SDK 地址，默认 https://uat.agentcici.com/sdk/agentcici-app.js；发布前确认环境已有该 SDK。自定义 functioncode 仍可覆盖，但必须遵守相同初始化要求。当前使用一个 Web 应用入口，由安装的 renderConfig.entryUrl 或 runtime.webUrl 决定。子页面统一使用 SDK `createClient()`，不再复制协议实现。
+打包工具为脚本菜单生成启动器，加载公共 SDK 后执行 `AgentCiCiApp.mount({appCode, launcherId})`。SDK 负责 CCDK 登录身份、runtime、连接应用换票、iframe 与初始化消息。自定义 functioncode 仍可覆盖，但必须遵守相同初始化要求。四层清单按入口读取 renderConfig.entryUrl 或安装站点地址；子页面统一使用 SDK `createClient()`，不复制协议实现。
 
 站点发布与 org 资源安装是不同阶段；静态文件就绪不代表智能体/技能已经安装。部署需要 backend 可写与 Nginx 只读的共享目录，以及 /aiapp/ 路由。平台上架权限保持管理员专有。
 
@@ -102,8 +102,8 @@ client.destroy();
 
 ## 统一宿主 SDK
 
-项目已提供 `frontend/public/sdk/agentcici-app.js`。菜单、详情脚本按钮及悬浮入口统一调用 `AgentCiCiApp.mount({appCode, name})`，位置由安装的 renderConfig.positions 决定（float/right/fullscreen/detail-right/list-right/dialog/home）；完整参数与现有应用适配见同目录 README.md。入口不再内联 runtime 请求、CCDK 换票或 iframe DOM。
+项目已提供 `frontend/public/sdk/agentcici-app.js`。菜单和脚本按钮调用 `AgentCiCiApp.mount({appCode, launcherId})`，全局悬浮入口调用 `AgentCiCiApp.start({appCode, launcherId})`。位置和 iframe/Shadow DOM 渲染方式由安装快照中对应入口的 renderConfig 决定；旧清单回退应用级 renderConfig。入口不再内联 runtime 请求、CCDK 换票或 iframe DOM。
 
 普通页面继续使用上述协议，context 额外提供 display、pageContext；存在连接应用时附加 cloudccContext。业务关闭方式、宿主层级和 CloudCC SSO 票据参数必须由各应用的 host 清单声明，公共 SDK 只执行通用协议，不识别具体 appCode、业务路由或票据前缀。Shadow DOM 应用通过 register 挂载，普通 React/Vue 应用继续使用 iframe，无需增加嵌入构建。SDK 已实现不代表目标环境已部署；不得在菜单里嵌入真实密钥。
 
-应用版本「安装内容」使用最新 renderConfig：renderer 为 iframe 或 shadow-dom，entryUrl 为入口地址，positions 为有序多选（第一项默认），并包含必填 closeBehavior 与 hostLayer，以及可选 authentication。安装成功后 setup-svc 保存快照，通过 appCode 返回。CRM 客户端脚本由清单生成，加载固定 agentcici-app@1.1.0.js 后仅传 appCode；公共 SDK 为所有应用创建同一种全局浮点入口，并读取安装配置中的名称、图标和位置。setup-svc读取并保存完整清单，根据steps创建对应CRM资源；缺少最新配置直接报错，不回退旧模型。
+应用版本「安装内容」的四层入口配置按 CRM 资源、触发入口、展示位置、渲染方式填写。每个入口保存自己的 renderConfig：renderer 为 iframe 或 shadow-dom，entryUrl/entryPath 为入口地址，positions 为有序多选（第一项默认），并包含 closeBehavior 与 hostLayer。setup-svc 保存快照，按 steps 创建对应 CRM 资源并保留资源 ID；思思快捷菜单从已安装菜单的真实 ID 生成。CRM 启动脚本加载固定 agentcici-app@1.1.0.js 后传 appCode 和 launcherId。

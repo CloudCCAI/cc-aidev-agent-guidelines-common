@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.5.0"
+  version: "1.5.2"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导纯前端 AI 应用开发、CloudCC 站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.5.0`。
+当前技能版本：`1.5.2`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -20,17 +20,19 @@ description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能�
 
 ## 入口类型与展示位置
 
-完整枚举、生命周期及示例见 [资源清单类型](references/application-manifest.md)。支持6种trigger与7种positions（包括fullscreen网页内全屏）。同一应用每种trigger最多一项，每项positions可多选且不重复，第一项默认。发布前按该表与客户确认，不将触发入口和展示容器混为一谈。appCode + trigger是多入口定位约定；当前SDK按trigger选配置的实现状态见该文档，不宣称未实现的能力。
+完整枚举、生命周期及示例见 [资源清单类型](references/application-manifest.md)。新清单设 `layoutVersion: 2`，按“CRM资源 → 触发入口 → 展示位置 → 渲染方式”配置；严格限制入口与位置的组合，每个入口独立保存 iframe 或 Shadow DOM 渲染配置。同一应用每种 trigger 最多一项，第一展示位置为默认。列表／详情脚本按钮由清单传入实际 `objects` 和 `payload.objid`，不能套用后台手工新建时的客户对象默认值。脚本菜单可设 `sisiShortcut: true`，安装后的真实菜单 ID 用于思思快捷按钮。
 
 ## 应用入口与安装职责
 
-新应用的入口脚本只向 `agentcici-app@1.1.0.js` 传 `appCode`，不要传 name/icon/position。名称、图标、触发方式与展示位置保存到资源清单；公共 SDK 按 appCode 请求 setup runtime 的已安装快照。全局浮点使用 `start({appCode})`，菜单/脚本按钮使用 `mount({appCode})`。入口浮点、拖动、去重和清理属于公共 SDK，不在每个应用复制一份。
+新应用的入口脚本向 `agentcici-app@1.1.0.js` 传 `appCode` 和稳定的 `launcherId`，不要传 name/icon/position。名称、图标、触发方式与入口级渲染配置保存到资源清单；公共 SDK 按 appCode 请求 setup runtime 的已安装快照。全局浮点使用 `start({appCode, launcherId})`，菜单/脚本按钮使用 `mount({appCode, launcherId})`。入口浮点、拖动、去重和清理属于公共 SDK，不在每个应用复制一份。
 
 普通 iframe Web 应用也必须在子页面引入同一 SDK，用 `AgentCiCiApp.createClient(...)` 获取宿主上下文；不再自行实现 `message` 监听、requestId 关联、超时或来源校验，也不要预置部署域名白名单。本地模式仅在顶层 localhost 页面显式传入 `localContext`。完整用法与验收见 [Web 应用开发](references/web-app-development.md#web-应用子页-sdk)。
 
 新 AI 应用默认创建并绑定 CloudCC 连接应用：源清单省略 `connectedApplications` 时按 `true` 编译，安装清单生成 `requiresConnectedApplication=true`。只有用户明确要求不创建、且应用不需要 CloudCC 用户身份或 OpenAPI 能力时，才显式设为 `false`。
 
 打包工具默认生成完整启动 JS，放入 installationManifest.steps 的 scriptContent/functioncode；application/launchers/renderConfig 一起随包提交。setup-svc 安装时保存清单，解析 SDK 地址占位符并按固定资源类型创建客户端脚本、菜单、按钮；setup-web 只预览和发起安装，不再代为调用资源创建接口。旧版本安装不会自动获得新入口配置，需要发布新版本并升级。
+
+新建页和编辑页入口未提供自定义 `file` 时，打包器自动生成 CRM 表单底部按钮的生命周期脚本；仍需确认对象范围并配置对应页面的 `pageType/onLoad` 资源参数。详见 [资源清单类型](references/application-manifest.md)。
 
 详情页按钮的创建与布局分配是两个步骤。发布前按 [清单规范](references/application-manifest.md#详情按钮的布局分配) 核对 placement，不能把 positions 当成按钮布局配置，也不能以按钮创建成功代替页面可见验收。
 

@@ -5,13 +5,14 @@
 ## 必填与条件项
 
 - schemaVersion固定2；appCode全局唯一；name名称；version三位0–9、逢9进位；summary非空描述。
+- 新四层配置设 `layoutVersion: 2`；未设置的旧清单保持原有兼容行为。
 - appType固定web；outputDir为单个构建目录，根层必须有index.html；entry为包内相对入口或完整HTTP(S)地址；renderer=iframe/shadow-dom。JS应用需实现AgentCiCiApp.register挂载协议。
 - host 为必填对象，使用最新统一宿主协议：closeBehavior 只能是 hide/confirm-destroy，hostLayer 只能是 content/assistant。需要 CloudCC SSO 票据的 iframe 应用在 host.authentication 中声明 type=cloudcc-sso-ticket、query、targetPath、ticketPrefix 和可选 localeParam；这些业务值属于应用清单，公共 SDK 不按 appCode 写死。
 - connectedApplications可选布尔，缺省为true并创建连接应用；只有用户明确不需要 CloudCC 身份/OpenAPI 时才写false。不要扩展为客户端权限对象。
 - agent可选且最多一个：platform包含type/ref，引用当前org开户已有实例；不能附file/skills/knowledges以重绑客户资源。custom包含type/ref/file，skills每项ref/file/bindingRef，knowledges每项ref/name/bindingRef。bindingRef来自原生智能体导出的依赖ref。可选keyType为cloudcc或standard，缺省cloudcc；需要直接调用智能体且不传CloudCC页面令牌时使用standard。
-- launchers 可选；Web 应用未声明时，打包器默认生成一个 `menu` 入口，展示位置为 `page-content`，菜单名使用应用名称，内部标识由 appCode 安全生成。显式提供时必须是非空数组；每项id（稳定且唯一）、name、trigger、positions（有序）、payload（查询确认的CRM安装字段）；可选icon/order/objects/placement。默认不需要file：打包器生成完整启动JS，仅传appCode；名称、图标与展示位置由SDK从安装快照获取。file仅用于确有业务自定义脚本的场景，必须位于应用目录内，内容原样打包。菜单图标和排序须映射为CRM payload字段，不能假定各入口字段相同。
+- launchers 可选；Web 应用未声明时，打包器默认生成一个 `menu` 入口，展示位置为 `page-content`，菜单名使用应用名称，内部标识由 appCode 安全生成。显式提供时必须是非空数组；每项id（稳定且唯一）、name、trigger、positions（有序）、payload（查询确认的CRM安装字段）；可选icon/order/objects/placement/renderer/entry。打包器生成完整启动JS并传 appCode + launcherId；每个入口的 renderer 和 entry 可覆盖应用默认值。file仅用于确有业务自定义脚本的场景，必须位于应用目录内，内容原样打包。菜单图标和排序须映射为CRM payload字段，不能假定各入口字段相同。脚本菜单可设 `sisiShortcut: true`，由安装回执中的菜单 ID 生成思思快捷链接。
 - installationManifest 同时保存 application（appCode/name/summary）、launchers（入口元数据）、renderConfig 和 steps（完整JS与资源字段）。SDK地址占位符 `__AGENTCICI_SDK_URL__` 由setup-svc根据服务端AgentCiCi域名解析，不需要客户填写name/icon/position或硬编码环境域名。
-- 同一应用每种trigger最多配置一项；这一项可配置多个不重复的positions，第一项为默认位置，其余可切换。入口id仍用于安装资源回执，不需要额外向SDK传launcherId。
+- 同一应用每种trigger最多配置一项；这一项可配置多个不重复的positions，第一项为默认位置，其余可切换。入口 id 用于安装资源回执和 SDK 入口级配置选择。
 
 ## trigger：触发方式
 
@@ -24,7 +25,9 @@
 | detail-button | 详情页按钮 | 自定义脚本按钮 |
 | list-button | 列表页按钮 | 自定义脚本按钮 |
 
-对象相关入口必须提供客户确认的objects及对应CRM payload。先通过CloudCC开发技能查询对象再请客户选择，不编造对象ID。新建/编辑页底部按钮需要提供已实现页面生命周期与按钮挂载的业务脚本file，公共SDK不猜测CRM表单DOM。
+对象相关入口必须提供客户确认的 `objects` 及对应 CRM payload。先通过 CloudCC 开发技能查询对象再请客户选择，不编造对象 ID；后台手工新建按钮的默认客户对象不适用于技能打包。新建/编辑页底部按钮未提供 `file` 时，打包器自动生成参考智能录入的页面生命周期脚本：读取 `obj.formId`，在 `[devid="footerButton"]` 中挂载按钮，点击后携带 `launcherId` 和 `launchContext.formId` 打开应用，表单关闭后清理实例。自定义 `file` 仍优先使用。CRM payload 应绑定对应新建页 `pageId=add` 或编辑页 `pageId=edit` 的 `pageType/onLoad`；多表单场景需核实底部容器定位。
+
+列表／详情脚本按钮参考 AI 听记的 CRM 参数结构：`payload.objid` 是查询得到的实际对象标识，`payload.tpSysButtonVO` 使用 `btnType=listBtn/detailBtn`、`category=CustomButton`、`event=lightning-script` 等目标 CRM 所需字段。打包器生成 `functionCode`，不覆盖传入的对象。详情页如需安装后可见，还要指定 `placement`；列表页不要使用详情布局分配值。
 
 脚本字段按资源类型区分：客户端脚本使用 scriptContent，菜单使用 functioncode，按钮使用 tpSysButtonVO.functionCode（大写 C）。打包后核对非空脚本，安装后读取按钮确认保存内容，不能仅以资源 ID 返回判定脚本可用。
 
@@ -43,7 +46,7 @@
 ```json
 {
   "trigger": "detail-button",
-  "positions": ["detail-right", "fullscreen"],
+  "positions": ["detail-right"],
   "placement": "allObjectDetailLayouts"
 }
 ```
@@ -62,6 +65,8 @@
 
 trigger里的global-floating表示小浮点入口，positions里的同名值表示打开后的浮窗，两者职责不同。
 
+`layoutVersion: 2` 时严格使用以下关系：`global-floating` 只可选择 `global-floating`、`global-right`、`fullscreen`；`create-button` 和 `edit-button` 只可选 `dialog`；`menu` 只可选 `page-content`；`detail-button` 只可选 `detail-right`；`list-button` 只可选 `list-right`。每个 launcher 编译为独立的 `renderConfig`，包含该入口的有序位置、iframe/Shadow DOM 渲染方式及加载地址。入口渲染方式与应用默认值不同时，必须给该入口配置匹配的 `entry`，避免 iframe 指向 JS 或 Shadow DOM 指向 HTML。
+
 全局浮点入口的外观、二维拖动、打开隐藏、关闭恢复和销毁由公共 SDK 统一实现；应用只能提供入口 name/icon，不提供业务专属入口样式或拖动规则。
 
 ```json
@@ -73,7 +78,7 @@ trigger里的global-floating表示小浮点入口，positions里的同名值表�
 
 以上为单个入口的类型配置片段；完整入口还需id/name/payload等字段。该例默认浮窗，可切换右侧或全屏。
 
-多入口定位约定为appCode + trigger，名称、图标、展示位置仍从安装快照读取。当前SDK尚未实现按trigger选择入口配置，现有生成器仍使用应用级renderConfig；不能把这一约定当作已完成的多入口运行能力。需要多入口各自使用不同位置时，先核对并补齐目标SDK支持。
+入口脚本调用 `mount({appCode, launcherId})`；全局浮点调用 `start({appCode, launcherId})`。SDK 按 launcherId 读取入口级 renderConfig，旧清单仍使用应用级 renderConfig。
 
 ## 问答流程
 
@@ -85,7 +90,7 @@ trigger里的global-floating表示小浮点入口，positions里的同名值表�
 6. 上传前展示appCode/version、资源类型、入口/展示位置、连接应用开关及目标环境。只有用户请求提交时submit；仅请求开发/准备时交付包。上架仍要求平台管理员身份，不能用开发者Token越权。
 
 示例问法：
-“还缺应用描述和展示位置。请补充一句用途说明；菜单点击后是在内容区打开，还是弹窗打开？”
+“还缺应用描述。请补充一句用途说明；脚本菜单默认在菜单内容区打开。”
 “已查询到客户、联系人、商机对象。这个详情页按钮需要安装在哪些对象？”
 
 源清单填写完成只说明信息完整，不等于已部署接口、已上架或真实客户安装成功。测试证据与真实业务验收分别报告。
