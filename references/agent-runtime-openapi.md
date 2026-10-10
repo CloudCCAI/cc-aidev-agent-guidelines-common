@@ -6,10 +6,30 @@
 
 Agent API Key 由组织管理员在智能体详情的“开放 API 文档/密钥管理”中创建、限制来源并管理生命周期。
 
+## apiBase 与请求路径
+
+- `apiBase` 是完整运行 API 基地址，包含 `/openapi/v1`。生产嵌入模式直接使用宿主 runtime 返回的 `context.apiBase`。
+- 本地测试在未提交的本地配置中提供完整 `apiBase`，例如 `http://127.0.0.1:8080/openapi/v1`；curl 示例中的 `AGENTCICI_API_BASE` 使用同样的完整地址。这与管理脚本使用的平台根地址 `AGENTCICI_BASE_URL` 不同。
+- 业务请求代码不得包含 `/openapi/v1` 字面量、前缀常量或补齐逻辑；只去掉 `apiBase` 末尾的斜杠，再拼接相对端点。不得提取 origin 或使用根路径覆盖 `apiBase` 已有路径。
+
+```js
+const apiBase = context.apiBase.replace(/\/$/, '');
+const response = await fetch(`${apiBase}/chat-messages`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${context.apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ user: context.user, query, responseMode: 'blocking' })
+});
+```
+
+验收时确认本地配置包含前缀，最终请求地址中的前缀恰好出现一次；带或不带末尾斜杠的 `apiBase` 都得到相同端点。源码与构建产物中的运行请求代码不得硬编码该前缀；本地配置缺失时修正配置，不在请求代码中兜底补齐。
+
 ## 快速调用
 
 ```bash
-curl -X POST "$AGENTCICI_BASE_URL/openapi/v1/chat-messages" \
+curl -X POST "${AGENTCICI_API_BASE%/}/chat-messages" \
   -H "Authorization: Bearer $AGENTCICI_API_KEY" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: order-question-001" \
@@ -23,19 +43,21 @@ curl -X POST "$AGENTCICI_BASE_URL/openapi/v1/chat-messages" \
 
 ## 运行端点
 
-| 能力 | 方法与路径 |
+以下路径均相对于 `apiBase`，表中的开头斜杠仅用于与基地址拼接。
+
+| 能力 | 方法与相对路径 |
 |---|---|
-| 参数信息 | `GET /openapi/v1/parameters` |
-| 发送消息 | `POST /openapi/v1/chat-messages` |
-| 停止流式任务 | `POST /openapi/v1/chat-messages/{taskId}/stop` |
-| 会话列表 | `GET /openapi/v1/conversations` |
-| 消息列表 | `GET /openapi/v1/messages` |
-| 会话改名 | `POST /openapi/v1/conversations/{conversationId}/name` |
-| 删除会话 | `DELETE /openapi/v1/conversations/{conversationId}` |
-| 消息反馈 | `POST /openapi/v1/messages/{messageId}/feedbacks` |
-| 推荐问题 | `GET /openapi/v1/messages/{messageId}/suggested` |
-| 上传文件 | `POST /openapi/v1/files/upload` |
-| 导入远程文件 | `POST /openapi/v1/files/import` |
+| 参数信息 | `GET /parameters` |
+| 发送消息 | `POST /chat-messages` |
+| 停止流式任务 | `POST /chat-messages/{taskId}/stop` |
+| 会话列表 | `GET /conversations` |
+| 消息列表 | `GET /messages` |
+| 会话改名 | `POST /conversations/{conversationId}/name` |
+| 删除会话 | `DELETE /conversations/{conversationId}` |
+| 消息反馈 | `POST /messages/{messageId}/feedbacks` |
+| 推荐问题 | `GET /messages/{messageId}/suggested` |
+| 上传文件 | `POST /files/upload` |
+| 导入远程文件 | `POST /files/import` |
 
 上传接口返回文件 `id` 后，在 `chat-messages.files[].upload_file_id` 中引用。文件类型、大小、模型能力或解析失败都应作为明确错误处理，不要静默忽略附件。
 

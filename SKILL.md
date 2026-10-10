@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.5.2"
+  version: "1.5.4"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导纯前端 AI 应用开发、CloudCC 站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.5.2`。
+当前技能版本：`1.5.4`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -71,6 +71,14 @@ script.src = url.href;
 - 换票、scope、错误语义：读 [references/authentication.md](references/authentication.md)。
 
 只读取当前任务所需的参考文件。
+
+## 智能体运行接口地址
+
+调用智能体运行 OpenAPI 时，`apiBase` 必须是包含 `/openapi/v1` 的完整 API 基地址。生产嵌入模式使用宿主 runtime 返回的 `context.apiBase`；本地测试配置的 `apiBase` 也必须包含该前缀。业务请求代码只拼接 `chat-messages`、`parameters` 等相对端点，不得包含、补齐、探测或重复拼接 `/openapi/v1`。具体示例与验收见 [运行 OpenAPI 教程](references/agent-runtime-openapi.md#apiBase-与请求路径)。
+
+## Web UI 一致性
+
+开发 Web 页面前必须阅读 [CloudCC CRM Web UI 规范](references/crm-web-ui.md)，按 CRM 的颜色、字体、控件密度、列表/表单/弹窗与操作布局实现。规则适用于 iframe 和 Shadow DOM；应用样式限定在自身容器内，导航、浮点与外壳关闭入口由宿主/公共 SDK 管理。交付前在实际桌面容器中对照 CRM 验收，不能只检查独立开发页面。
 
 ## Web 应用默认交付
 

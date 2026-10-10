@@ -1,5 +1,7 @@
 # 纯前端 Web 应用规范
 
+开发前必须先读 [CloudCC CRM Web UI 规范](crm-web-ui.md)，统一视觉变量、紧凑工具栏、列表密度、表单与弹窗样式，并按其桌面验收流程核查；不要让 AI App 在 CRM 中呈现另一套产品外观。
+
 ## 构建与站点
 
 React、Vue 或原生前端均可，交付静态构建目录，根层必须有 index.html。不要交付 node_modules、开发服务器、SSR 服务或源码目录。资源地址相对站点目录；多页面应用应明确入口，SPA 默认使用 hash 路由，除非实际站点已验证 history fallback。在非根子路径验证 JS/CSS、图片、字体、动态加载和页面刷新，不能只测试开发服务器。
@@ -11,6 +13,8 @@ React、Vue 或原生前端均可，交付静态构建目录，根层必须有 i
 ## 用户与智能体接入
 
 目前真实运行接口见 [agent-runtime-openapi.md](agent-runtime-openapi.md)，使用 Agent API Key；开发者密钥用于管理，不能直接用于运行。纯前端不嵌入开发者 Secret 或长期 Agent API Key。
+
+运行请求直接使用 `context.apiBase`，它已包含 `/openapi/v1`；业务代码只追加相对端点，不得硬编码该前缀或在缺失时自动补齐。独立本地测试的 `localContext.apiBase` 必须配置完整 API 基地址，例如 `http://127.0.0.1:8080/openapi/v1`。地址拼接与验收见 [运行接口地址规范](agent-runtime-openapi.md#apiBase-与请求路径)。
 
 应用调用以逻辑 agent ref 为输入，由受信服务基于登录用户、org 和安装记录解析真实智能体。通用应用网关尚未提供，不能把此前讨论的网关当成现成 API。项目提供的 agentcici-app.js 是 CloudCC 宿主嵌入 SDK，负责安装配置、换票和 iframe，不是服务端运行网关。真实联调前核对目标环境提供的运行适配层；缺少时保留 mock 和明确阻塞，或在授权范围内实现服务端适配后再接入。已有思思 runtime 接口为特定安装方案，不自动适用于任意新应用。
 
