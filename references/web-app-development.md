@@ -111,3 +111,7 @@ client.destroy();
 普通页面继续使用上述协议，context 额外提供 display、pageContext；存在连接应用时附加 cloudccContext。业务关闭方式、宿主层级和 CloudCC SSO 票据参数必须由各应用的 host 清单声明，公共 SDK 只执行通用协议，不识别具体 appCode、业务路由或票据前缀。Shadow DOM 应用通过 register 挂载，普通 React/Vue 应用继续使用 iframe，无需增加嵌入构建。SDK 已实现不代表目标环境已部署；不得在菜单里嵌入真实密钥。
 
 应用版本「安装内容」的四层入口配置按 CRM 资源、触发入口、展示位置、渲染方式填写。每个入口保存自己的 renderConfig：renderer 为 iframe 或 shadow-dom，entryUrl/entryPath 为入口地址，positions 为有序多选（第一项默认），并包含 closeBehavior 与 hostLayer。setup-svc 保存快照，按 steps 创建对应 CRM 资源并保留资源 ID；思思快捷菜单从已安装菜单的真实 ID 生成。CRM 启动脚本加载固定 agentcici-app@1.1.0.js 后传 appCode 和 launcherId。
+
+### CRM 租户归属验收
+
+标准 SDK 的 Agent API Key 决定正式租户，CRM userId 仅区分当前用户及业务上下文，不作为计费租户。第三方应用无需自行查询或维护 CRM 租户映射。官方 CRM 专用会话由平台验证开户映射；新消费归正式组织，旧业务隔离身份及历史账单保留。验收覆盖模型、实时/文件语音及异步任务，并核对正式组织的计费流水；缺少绑定不得静默继续使用独立赠送额度。
