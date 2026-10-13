@@ -1,4 +1,4 @@
-# 纯前端 Web 应用规范
+# 第三方 Web 应用规范
 
 开发前必须先读 [CloudCC CRM Web UI 规范](crm-web-ui.md)，统一视觉变量、紧凑工具栏、列表密度、表单与弹窗样式，并按其桌面验收流程核查；不要让 AI App 在 CRM 中呈现另一套产品外观。
 
@@ -10,9 +10,53 @@ React、Vue 或原生前端均可，交付静态构建目录，根层必须有 i
 
 构建包只包含运行必需文件，排除 .env、源码映射、凭据、真实客户数据。VITE_* 等构建变量会进入浏览器，不是密钥存储。打包工具仅做文件名与结构检查，不能证明编译后代码没有敏感内容。
 
+## CloudCC 数据存储与业务逻辑
+
+标准架构为 **Web → 自定义类 → 自定义对象**。Web 继续按上述方式构建、部署和嵌入；CloudCC 提供数据存储和业务逻辑。
+
+需要持久化时，先核对目标业务模型，创建 CloudCC 自定义对象和字段。明确对象/字段 API Name、类型、关系和访问权限；代码使用 API Name 引用，在目标 org 安装时再解析平台接口所需的内部 ID。不要把业务数据存入浏览器 localStorage 作为正式存储，也不要求开发者另外搭建数据库。
+
+有业务逻辑时，编写 CloudCC 自定义类，集中完成读取、写入、业务校验及权限检查。类的方法和参数应形成清楚的业务契约，返回前端需要的数据；浏览器不直接操作对象来绕过类中的规则。对象定义、字段定义和类源码随业务资源交付，真实客户记录不随包提交。
+
+### Web 调用自定义类
+
+CRM 宿主页面具备 CCDK 时，通过 CCDK 的 `ccommon` 调用自定义类，方法签名以目标环境提供的 CCDK 为准。跨域 iframe Site 通过公共 SDK 获取上下文，使用 OpenAPI；不默认 Site 已加载 CCDK，不直接访问 `parent.$CCDK`。
+
+iframe 中的调用顺序：等待 `client.ready`，从每次请求时的 `client.getContext().cloudccContext` 读取最新 `accessToken` 和 `ccex-apitsf`，向该服务的 `/api/openCall/common` 发起 POST：
+
+```js
+const crm = client.getContext().cloudccContext;
+const response = await fetch(
+  crm['ccex-apitsf'].replace(/\/$/, '') + '/api/openCall/common',
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accessToken: crm.accessToken },
+    body: JSON.stringify({
+      className: 'OrderApplication',
+      methodName: 'saveOrder',
+      params: [orderInput]
+    }),
+    signal: abortController.signal
+  }
+);
+const result = await response.json();
+if (!response.ok || result.result !== true) {
+  throw new Error(result.returnInfo || '自定义类调用失败');
+}
+const order = result.data;
+```
+
+`OrderApplication`、`saveOrder` 为示例，必须替换成实际已安装的类与方法；`params` 为按方法契约组织的参数数组。Token 对自定义类调用通用，但 AgentCiCi 的 `apiKey` 和开发者 Token 不能替代这里的 CloudCC Token。CloudCC 服务地址使用 `ccex-apitsf`，不要拼到智能体的 `context.apiBase`。
+
+目标环境已部署 `agentcici-cloudcc@1.0.0.js` 时，可以加载该辅助脚本并用 `AgentCiCiCloudCC.createCaller(client).callClass(className, methodName, params)` 封装上述请求；它依赖已初始化的公共 SDK client。未部署时使用应用自身的小调用模块，不假设辅助脚本已上线。动态加载 JS 仍遵守技能入口的时间戳缓存规则。
+
+调用层检查 HTTP 与业务返回，处理超时、取消和错误；切换用户/org/Token 时取消旧请求，页面卸载时清理调用器与 client。写入请求失败或超时后先核实结果，不自动重复提交。Token 不进入 URL、日志、localStorage 或构建产物。跨域 OpenAPI 调用仍需目标服务允许站点 Origin；没有上下文、未安装类、无权限或 CORS 不通时明确报错，不退回测试身份。
+
+验收应使用实际 org 验证：Web 调用已安装类成功、类读写正确对象与字段、无权限被拒绝、org 之间数据隔离；模拟返回成功不等于真实业务联调通过。
+
 ## 用户与智能体接入
 
-目前真实运行接口见 [agent-runtime-openapi.md](agent-runtime-openapi.md)，使用 Agent API Key；开发者密钥用于管理，不能直接用于运行。纯前端不嵌入开发者 Secret 或长期 Agent API Key。
+目前真实运行接口见 [agent-runtime-openapi.md](agent-runtime-openapi.md)，使用 Agent API Key；开发者密钥用于管理，不能直接用于运行。Web 前端不嵌入开发者 Secret 或长期 Agent API Key。
 
 运行请求直接使用 `context.apiBase`，它已包含 `/openapi/v1`；业务代码只追加相对端点，不得硬编码该前缀或在缺失时自动补齐。独立本地测试的 `localContext.apiBase` 必须配置完整 API 基地址，例如 `http://127.0.0.1:8080/openapi/v1`。地址拼接与验收见 [运行接口地址规范](agent-runtime-openapi.md#apiBase-与请求路径)。
 

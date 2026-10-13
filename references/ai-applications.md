@@ -14,6 +14,18 @@
 
 包存储、OSS和最多5个版本清理见 [存储规范](application-storage.md)。开发者不需要OSS密钥。申请SUBMITTED、草稿DRAFT和市场已发布是不同状态。
 
+## 选用智能体前核验类型
+
+开发时选定智能体、生成源清单前，使用目标环境和目标组织的开发者凭据执行 `python3 scripts/agentcici_manage.py agents get AGENT_ID`（需要 `agent.read`），读取真实 `agentId`、`builtin`、`enabled`、`publishedVersionId` 与 `channels`。在应用交付记录中保存环境、核验时间和这些非敏感结果；打包提交前确认查询结果与清单一致。
+
+- `builtin=true` 才可声明 `agent.type=platform`，生成 `platformAgent={ref}` 并保持 `agents` 为空；引用当前安装组织的内置实例，不导出或覆盖它。
+- `builtin=false` 必须声明 `agent.type=custom`，提供原生 `.ciciagent` 导出包并按真实导出结果映射技能、知识库及其他依赖；即使该智能体在本组织已存在、已发布且 API 可调用，也不能改为平台引用。
+- `builtin` 缺失、不是布尔值、读取失败或环境/组织身份未确认时，不能猜测类型；暂停智能体打包与提交，继续不依赖该判断的开发和只读核验。
+
+名称含“平台”或“CRM”、组织内已存在、已发布、具有 `api` 渠道，均不能作为平台类型依据。`keyType=standard/cloudcc` 是运行鉴权方式，与 `builtin` 和打包类型独立；不通过修改 `builtin`、更换智能体或放宽安装校验来掩盖类型不符。
+
+类型确认后另行核验启用、发布及运行权限；选择了平台引用的应用，在目标安装组织核验同一 ref 的内置实例、发布状态与权限。无法访问该组织时明确记录待验，不将源组织查询、包格式校验或模拟页面测试当作真实安装通过。
+
 ## 包内协议与兼容
 
 外层仍为 `format=agentcici-application-request, formatVersion=1`。含 application.json、单个 site.zip（根层index.html）、自定义智能体 agents/<ref>.ciciagent、独立技能 skills/<ref>.zip。新清单入口代码写入 installationManifest.steps；仅旧menu格式额外生成 cloudcc/menu.json。sha256覆盖所有外层文件，application.json自身除外，原生包字节不变。
@@ -29,6 +41,14 @@
 setup调用已发布版本的安装清单和 POST `/openapi/v1/management/ai-applications/{app}/versions/{version}/install-resources`，需要application.install。自定义资源在当前org创建并绑定；平台智能体按ref读取当前org实例及已发布版本，不导出或覆盖客户修改。平台智能体不存在、无权限或未发布时明确失败，不跨org取资源。每个应用最多一个智能体和一个Web应用。
 
 connectedApplications是可选布尔开关，缺省为true，转换为requiresConnectedApplication；setup为true时创建连接应用。只有用户明确不需要 CloudCC 身份/OpenAPI 时才设为false。运行时由宿主换取OpenAPI token，Secret不传入应用、Key和token不放URL。安装steps携带完整客户端脚本/菜单/按钮源码，由setup-svc固定适配器执行，setup-web只请求 /install 或 /uninstall。pendingManifest保存本次安装清单，installationManifest在成功后保存完整已安装快照；runtime只返回application/launchers/renderConfig等运行字段，不返回完整脚本清单。每步资源ID存入resources，首次安装失败按记录自动清理；升级失败保留升级失败状态和已有资源，不能当成首次安装删除。真实安装验收与本地验证分别记录。
+
+## CloudCC 业务资源交付
+
+第三方应用仍以一个 Web 应用为主体。需要存储时提供自定义对象及字段定义，需要业务逻辑时提供自定义类源码；Web 按 [调用规范](web-app-development.md#web-调用自定义类) 请求类，由类操作对象。明确每项资源的 API Name 和依赖顺序，对象先于字段、依赖资源先于调用它们的类；内部 ID 由安装 org 解析，业务数据与凭据不打包。
+
+上文 `formatVersion=1` 和常用 `package` 命令描述现有 Web/AI 资源流程，不能据此声称已经打包业务资源。业务资源使用外层 `formatVersion=2`、`cloudccResources` 声明及 `installationManifest.schemaVersion=2`。执行前核对打包工具、发布接收端和 setup-svc 是否实际支持；当前技能中的原有打包脚本不自动生成这些业务资源，缺少支持时明确列出交付定义、源码和阻塞，不静默忽略它们。
+
+业务资源安装归入当前 AI 应用安装流程，由 setup-svc 的原生能力创建对象、字段和类；不依赖 MetadataService，也不复用传统软件包安装器。schemaVersion=2 使用安装计划与服务端操作状态，不能套用前述旧 `/install` 流程或首次失败自动删除规则。升级、恢复及清理以目标环境已提供的能力为准；不得推断可自动修改/删除已有结构与类源码，或删除客户业务数据。
 
 ## 常用命令
 
