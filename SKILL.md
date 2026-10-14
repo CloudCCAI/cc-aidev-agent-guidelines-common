@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.5.7"
+  version: "1.5.8"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.5.7`。
+当前技能版本：`1.5.8`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -27,6 +27,18 @@ description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能�
 普通 AI 应用按标准 SDK/API Key 调用；后端以 API Key 所属 AgentCiCi 租户检查授权和计费。不要自行生成 `crmwb_` 身份、传入收费租户或复制官方应用专用认证流程。
 
 官方 CRM 专用会话保留 CRM 业务隔离身份，通过开户保存的 CRM orgId → AgentCiCi companyId 映射解析正式资源租户。授权、模型配置、语音和模型 Credits 均归正式租户；映射缺失必须明确报错，不能回退到独立赠送额度。验收核对实际用量事件及结算租户，不能只看页面可打开或请求成功。
+
+## CloudCC 资源开发前置要求
+
+AI 应用涉及新建或修改 CloudCC 自定义类、对象、字段时，必须先检查开发者当前 AI 工具是否已安装并可读取 `cc-customization-expert-msapi`。技能来源为 [CloudCC 专用开发技能](https://github.com/CloudCCAI/cc-customization-expert-msapi)，不能仅凭通用 Java 知识或本 Skill 的示例生成平台资源。
+
+- 检查当前工具的技能目录：必须有该技能的 `SKILL.md` 和可运行的 `tools/bin/cloudcc`。Codex 使用 `${CODEX_HOME:-$HOME/.codex}/skills/cc-customization-expert-msapi`；其他工具使用其实际技能目录，不把项目源码目录视为已安装。
+- 未安装时，先从上述仓库安装完整技能包，再读取其 `SKILL.md` 并运行包内 `tools/bin/cloudcc --version`。Codex 优先使用 `skill-installer` 的 `scripts/install-skill-from-github.py --repo CloudCCAI/cc-customization-expert-msapi --path . --name cc-customization-expert-msapi`；仓库根目录就是技能根目录，不能只下载 `SKILL.md`。其他工具使用自身支持的技能安装方式。已安装时复用，不覆盖现有技能或环境配置；安装不完整时报告缺失项。
+- 在设计和生成定义/源码前，读取对应开发文档：对象用 `tools/bin/cloudcc doc platform/object devguide`，字段用 `tools/bin/cloudcc doc platform/fields devguide`，自定义类用 `tools/bin/cloudcc doc platform/classes devguide`。这些命令在 CloudCC 技能根目录执行；涉及多类资源时逐项读取，不能等到发布前才读。
+- 同时遵守 CloudCC 技能要求的平台能力文档和按需文档，例如类调用外部 HTTP 前读取 `platform/apiRegistrar devguide`。按文档确认 API Name、字段类型/约束/关系、类结构、平台 SDK、权限与校验规则；修改前回读实际资源。
+- 技能安装失败、CLI 不可运行或对应文档无法读取时，不继续猜测并生成这些资源；说明具体缺失，仍可继续不依赖这些资源的前端工作。
+
+这里安装的是开发者本机的开发技能，不是向客户 CRM org 安装业务资源。文档中的 CLI 元数据操作与 AI 应用包安装是不同通道：AI 应用业务资源仍由目标环境已部署的 setup-svc 原生能力安装，不因此引入 MetadataService 或传统软件包安装器依赖；直接操作开发 org 时则遵守 CloudCC 技能的 provider 要求。
 
 ## 第三方 Web 应用开发规范
 
