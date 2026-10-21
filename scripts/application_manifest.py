@@ -264,5 +264,7 @@ def compile_manifest(config, root):
     if agent: installation['agentRuntime'] = {'agentId': agent['ref'], 'keyType': key_type}
     if 'mcpServers' in config: installation['mcpServers'] = copy.deepcopy(config['mcpServers'])
     if 'tools' in config: installation['tools'] = copy.deepcopy(config['tools'])
+    if 'cloudccResources' in config: result['cloudccResources'] = copy.deepcopy(config['cloudccResources'])
+    if 'upgrade' in config: installation['upgrade'] = copy.deepcopy(config['upgrade'])
     result['installationManifest'] = installation
     return result

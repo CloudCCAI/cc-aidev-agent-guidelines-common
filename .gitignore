@@ -3,3 +3,5 @@ __pycache__/
 
 cloudcc-agentcici.config.json
 .cloudcc-agentcici-*.tmp
+cloudcc-cli.config.json
+.cloudcc-cache.json

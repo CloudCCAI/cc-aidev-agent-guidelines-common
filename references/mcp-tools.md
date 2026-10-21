@@ -10,7 +10,7 @@ MCP 服务是 AgentCiCi 连接外部工具能力的服务配置。一个服务�
 - `timeoutSeconds` 应按外部服务延迟设置；默认 60 秒。
 - `enabled=false` 会停止该服务进入运行时工具集合。
 - `clientSecret` 只在创建或轮换时发送；响应只返回 `clientSecretConfigured`。
-- `discover` 会连接 MCP 服务并刷新工具缓存；`tools` 只读取缓存。工具由 MCP 服务提供，不能在平台单独创建或编辑；本技能不调用工具，也不执行健康检查。
+- `discover` 会连接 MCP 服务并刷新工具缓存；`tools` 只读取缓存。工具由 MCP 服务提供，不能在平台单独创建或编辑；本技能负责服务配置、发现和关联；工具实际执行通过已关联的智能体进行业务联调，不杜撰直接调用工具的管理命令。
 
 ## 管理 API
 
@@ -45,3 +45,12 @@ MCP 服务是 AgentCiCi 连接外部工具能力的服务配置。一个服务�
 2. `tools list` 读取组织现有的内置、自定义与应用 MCP 工具，需 `agent.read` 权限；普通 MCP 服务的工具用 `mcp tools SERVER_ID` 读取，需 `mcp.read` 权限。需要刷新时先运行 `mcp discover SERVER_ID`，需 `mcp.write` 权限。发现结果包含每个工具的 `name`、描述和输入结构。发现失败或缓存状态不是 `ready` 时，不把旧缓存当作已验证的当前工具。
 3. 读取目标智能体详情，保留现有 `toolIds`，只加入用户选中的现有工具名称，运行 `agents bind-tools AGENT_ID --file /absolute/path/binding.json`。请求体是完整 `{"toolIds":["existing_tool","selected_tool"]}`；此命令替换全部工具关联。
 4. 如需生效到已发布智能体，按 [智能体编译发布](agents.md#关联资源与编译发布) 编译并发布本次返回的版本。技能的 `toolWhitelist` 如有限制，也要包含选中的工具。
+
+## CloudCC CRM MCP选择
+
+- 业务数据处理使用 `https://mcp.cloudcc.cn/crm`，用于按真实工具能力查询、处理CRM业务记录。
+- 元数据处理使用 `https://msapi.cloudcc.cn/msapi`，用于按真实工具能力处理对象、字段等元数据。末尾中文句号不是URL的一部分。
+- 先查询组织已有服务再复用或创建；按目标服务实际要求配置认证，不能假设匿名可用、工具集合相同或将AgentCiCi开发者Secret当CRM认证。认证不明或发现失败时记录阻塞，不猜工具名/schema。
+- 这两个服务是候选能力，按应用需求选择；不要求每个智能体都绑定两者或全部工具。开发过程创建CRM资源继续使用CloudCC CLI；应用智能体通过所关联MCP执行业务，两者职责不同。
+- 发现后读取每个工具的名称、描述与输入结构，选择所需项关联智能体，并核对技能白名单，重新编译发布后才进入运行版本。发布包MCP仅含ref/name/description/transportType/url，工具仅含ref/name/source/mcpRef，不含开发headers、Client Secret或Token；安装后的运行认证按目标组织机制配置，不能复制测试身份。
+- 普通GET失败不能证明MCP不可用；必须以MCP协议发现和实际智能体调用判断。本次核查尚未验证这两个服务的协议、认证、工具清单或业务调用。

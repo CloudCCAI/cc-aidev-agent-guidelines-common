@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import argparse
 import io
+import mimetypes
+import re
 import zipfile
+import uuid
 import hashlib
 import json
 import pathlib
@@ -58,6 +61,27 @@ class Client:
         if len(result) > 100 * 1024 * 1024 or not zipfile.is_zipfile(io.BytesIO(result)):
             raise RuntimeError("服务端未返回有效 ZIP 或包超过 100 MiB")
         return result
+
+    def upload_document(self, path, filename):
+        file = pathlib.Path(filename)
+        if not file.is_file() or not 0 < file.stat().st_size <= 100 * 1024 * 1024:
+            raise RuntimeError("资料必须为非空且不超过100 MiB的文件；服务端仍校验上传策略")
+        boundary = 'cici-document-' + uuid.uuid4().hex
+        name = re.sub(r'[\r\n"\\]', '_', file.name)
+        content_type = mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
+        body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\n'
+                f'Content-Type: {content_type}\r\n\r\n').encode() + file.read_bytes() + f'\r\n--{boundary}--\r\n'.encode()
+        request = urllib.request.Request(self.base_url + path, data=body, method='POST', headers={
+            'Authorization': 'Bearer ' + self.exchange(), 'Content-Type': 'multipart/form-data; boundary=' + boundary,
+            'Accept': 'application/json'})
+        try:
+            with urllib.request.build_opener(NoCredentialRedirect()).open(request, timeout=120) as response:
+                result = json.load(response)
+        except (urllib.error.URLError, TimeoutError):
+            raise RuntimeError('文档上传失败或结果未知；先查询文档列表核实，不自动重复上传') from None
+        if not result.get('success'):
+            raise RuntimeError('文档上传未成功，请核对上传策略和知识库权限')
+        return result.get('data')
 
     def _request(self, method: str, path: str, body: dict[str, Any] | None, authenticated: bool) -> Any:
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
@@ -138,6 +162,25 @@ def add_resource_commands(module: argparse.ArgumentParser, id_name: str) -> None
             command = commands.add_parser(name, help="读取已有工具" if name == "tools" else "从 MCP 服务重新发现工具")
             command.add_argument(id_name)
 
+    return commands
+
+
+def add_knowledge_commands(module):
+    commands = add_resource_commands(module, 'resource_id')
+    documents = commands.add_parser('documents', help='读取知识库文档与索引状态')
+    documents.add_argument('resource_id')
+    upload = commands.add_parser('upload', help='上传授权测试资料，需另外发布索引')
+    upload.add_argument('resource_id')
+    upload.add_argument('--file', required=True)
+    retrieve = commands.add_parser('retrieve', help='检索测试')
+    retrieve.add_argument('resource_id')
+    add_payload_arguments(retrieve)
+    for action in ('publish-document', 'reindex-document', 'delete-document'):
+        command = commands.add_parser(action)
+        command.add_argument('resource_id', help='文档ID')
+        if action == 'delete-document':
+            command.add_argument('--confirm-id', required=True)
+
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="使用开发者密钥管理 AgentCiCi 智能体、技能和 MCP 服务")
@@ -145,12 +188,13 @@ def parser() -> argparse.ArgumentParser:
     add_resource_commands(modules.add_parser("agents", help="管理智能体"), "resource_id")
     add_resource_commands(modules.add_parser("skills", help="管理技能"), "resource_id")
     add_resource_commands(modules.add_parser("mcp", help="管理 MCP 服务"), "resource_id")
+    add_knowledge_commands(modules.add_parser("knowledge", help="管理知识库、文档与检索"))
     modules.add_parser("tools", help="读取组织现有工具，不创建工具").add_subparsers(dest="command", required=True).add_parser("list")
     return root
 
 
 def resource_path(module: str) -> str:
-    suffix = {"agents": "agents", "skills": "skills", "mcp": "mcp-servers"}[module]
+    suffix = {"agents": "agents", "skills": "skills", "mcp": "mcp-servers", "knowledge": "knowledge-bases"}[module]
     return "/openapi/v1/management/" + suffix
 
 
@@ -171,13 +215,27 @@ def execute(client, args):
         return client.request("GET", path + "/tools")
     if args.command == "discover":
         return client.request("POST", path + "/discover")
+    if args.module == 'knowledge':
+        if args.command == 'documents':
+            return client.request('GET', path + '/documents')
+        if args.command == 'upload':
+            return client.upload_document(path + '/documents', args.file)
+        if args.command == 'retrieve':
+            return client.request('POST', path + '/retrieval/test', read_payload(args))
+        if args.command in ('publish-document', 'reindex-document', 'delete-document'):
+            document_path = base + '/documents/' + urllib.parse.quote(args.resource_id, safe='')
+            if args.command == 'delete-document':
+                if args.resource_id != args.confirm_id:
+                    raise RuntimeError('--confirm-id 必须与待删除文档 ID 完全一致')
+                return client.request('DELETE', document_path)
+            return client.request('POST', document_path + ('/publish' if args.command == 'publish-document' else '/reindex'), {})
     if args.command == "create":
         return client.request("POST", base, read_payload(args))
     if args.command == "update":
         body = read_payload(args)
-        if args.module in ("skills", "mcp"):
+        if args.module in ("skills", "mcp", "knowledge"):
             current = client.request("GET", path)
-            fields = SKILL_FIELDS if args.module == "skills" else MCP_FIELDS
+            fields = SKILL_FIELDS if args.module == "skills" else MCP_FIELDS if args.module == "mcp" else ["name", "description"]
             body = {**{k: v for k, v in current.items() if k in fields}, **body}
         return client.request("PATCH" if args.module == "agents" else "PUT", path, body)
     if args.command == "export":

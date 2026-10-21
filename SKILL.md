@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.5.9"
-description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
+  version: "1.6.3"
+description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能、知识库和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.5.9`。
+当前技能版本：`1.6.3`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -17,6 +17,10 @@ description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能�
 - 每次技能更新从最右位递增；该位为 9 时归零并向左进位，例如 `1.2.8 → 1.2.9 → 1.3.0`、`1.9.9 → 2.0.0`。
 - 同步更新 frontmatter 的 `metadata.version`、正文版本及本地安装副本。系统内部的数字版本 ID 不受此规则影响。
 - `9.9.9` 已达此格式上限，后续版本规则由用户决定，不回绕或重复使用旧版本。
+
+## AI App 开发入口
+
+创建或继续开发AI应用时，先读 [AI App七阶段开发流程](references/development-workflow.md)，按需求讨论、设计、平台文档、开发、本地联调、打包发布、CRM菜单系统功能测试推进。每个应用在自身docs中保存需求、设计与测试记录。资源范围含Web、对象/字段、自定义类、智能体、技能、知识库和MCP工具，按业务需要创建并关联；暂不扩展触发器或定时类。启动先分别检查AgentCiCi与CloudCC CRM两套开发配置，不混用凭据，测试密钥及缓存不得入发布包。CRM系统测试限当前用户桌面业务流程，不默认多用户、多角色或移动端测试。
 
 ## 入口类型与展示位置
 
@@ -34,9 +38,25 @@ AI 应用涉及新建或修改 CloudCC 自定义类、对象、字段时，必�
 
 - 检查当前工具的技能目录：必须有该技能的 `SKILL.md` 和可运行的 `tools/bin/cloudcc`。Codex 使用 `${CODEX_HOME:-$HOME/.codex}/skills/cc-customization-expert-msapi`；其他工具使用其实际技能目录，不把项目源码目录视为已安装。
 - 未安装时，先从上述仓库安装完整技能包，再读取其 `SKILL.md` 并运行包内 `tools/bin/cloudcc --version`。Codex 优先使用 `skill-installer` 的 `scripts/install-skill-from-github.py --repo CloudCCAI/cc-customization-expert-msapi --path . --name cc-customization-expert-msapi`；仓库根目录就是技能根目录，不能只下载 `SKILL.md`。其他工具使用自身支持的技能安装方式。已安装时复用，不覆盖现有技能或环境配置；安装不完整时报告缺失项。
-- 在设计和生成定义/源码前，读取对应开发文档：对象用 `tools/bin/cloudcc doc platform/object devguide`，字段用 `tools/bin/cloudcc doc platform/fields devguide`，自定义类用 `tools/bin/cloudcc doc platform/classes devguide`。这些命令在 CloudCC 技能根目录执行；涉及多类资源时逐项读取，不能等到发布前才读。
+- **设计前先获取文档**：涉及自定义类、对象或字段时，必须先执行下列对应资源的两条命令，读取 `introduction`（资源介绍）和 `devguide`（开发指南），再进行该资源的设计、定义或源码生成。涉及多类资源时，逐类读取两份文档；不能先设计后补读，也不能等到开发或发布前才读。这里的 `cloudcc` 指已安装专用技能内的 `tools/bin/cloudcc`，实际调用使用该程序的绝对路径，不依赖全局 CLI。
 - 同时遵守 CloudCC 技能要求的平台能力文档和按需文档，例如类调用外部 HTTP 前读取 `platform/apiRegistrar devguide`。按文档确认 API Name、字段类型/约束/关系、类结构、平台 SDK、权限与校验规则；修改前回读实际资源。
 - 技能安装失败、CLI 不可运行或对应文档无法读取时，不继续猜测并生成这些资源；说明具体缺失，仍可继续不依赖这些资源的前端工作。
+
+设计前按资源类型执行：
+
+```bash
+# 自定义类
+cloudcc doc classes introduction
+cloudcc doc classes devguide
+
+# 自定义对象
+cloudcc doc object introduction
+cloudcc doc object devguide
+
+# 自定义字段
+cloudcc doc fields introduction
+cloudcc doc fields devguide
+```
 
 这里安装的是开发者本机的开发技能，不是向客户 CRM org 安装业务资源。文档中的 CLI 元数据操作与 AI 应用包安装是不同通道：AI 应用业务资源仍由目标环境已部署的 setup-svc 原生能力安装，不因此引入 MetadataService 或传统软件包安装器依赖；直接操作开发 org 时则遵守 CloudCC 技能的 provider 要求。
 
@@ -47,9 +67,13 @@ AI 应用涉及新建或修改 CloudCC 自定义类、对象、字段时，必�
 - 数据存储：创建 CloudCC 自定义对象和字段，保存业务数据；先核对已有对象与字段，避免重复创建。对象、字段的业务引用使用 API Name，不在代码或可分发包中写死源 org 的内部 ID。
 - 业务逻辑：使用 CloudCC 自定义类实现查询、写入、校验和业务规则。Web 负责展示、交互及必要的输入提示，最终校验和访问权限在自定义类中按当前用户与 org 执行；不信任前端传入的组织或用户身份。
 - 调用方式：CRM 宿主中的 Web 可通过 CCDK 的 `ccommon` 调用自定义类；iframe Site 使用宿主 SDK 提供的 `cloudccContext`，通过 OpenAPI 调用同一自定义类。不要直接读取跨域 parent 的 CCDK，也不要把业务数据读写改为浏览器直接访问对象接口。
-- 交付内容：除 Web 构建产物外，需要时提供对象、字段定义与自定义类源码，纳入 AI 应用包的业务资源。开发与安装不依赖 MetadataService，不复用传统软件包安装代码；具体打包与安装以目标环境已部署能力为准。
+- 交付内容：除 Web 构建产物外，需要时提供对象、字段定义与自定义类源码，纳入 AI 应用包的业务资源。客户安装不依赖 MetadataService；直接开发CRM资源时遵守专用技能的provider规则，不复用传统软件包安装代码；具体打包与安装以目标环境已部署能力为准。
 
 按需读取 [Web 应用开发中的数据与业务逻辑](references/web-app-development.md#cloudcc-数据存储与业务逻辑) 和 [业务资源交付](references/ai-applications.md#cloudcc-业务资源交付)。没有存储或业务规则的应用不强制增加对象或类。
+
+## AI 应用项目组织
+
+默认在一个项目根目录下，用 `applications/<appCode>/` 管理多个应用；新建首个应用也采用此结构。每个应用独立维护 `application.json`、源码、构建和发布产物，根目录共用 `cloudcc-agentcici.config.json`、`cloudcc-cli.config.json` 和 `.cloudcc-cache.json`，多个应用不分别配置CRM凭据；源码、对象定义和文档仍在各自应用内。CRM类操作使用 [共用配置适配入口](references/cloudcc-shared-config.md)，不通过切换代码目录来迁就配置路径。详细目录、路径解析、Git 忽略及已有项目处理规则见 [项目与多应用目录](references/application-manifest.md#项目与多应用目录)。开始开发应用前读取该节；遵循用户明确指定的结构，不自动迁移已有项目，不把业务文件放入技能安装目录。
 
 ## 应用入口与安装职责
 
@@ -93,12 +117,13 @@ script.src = url.href;
 
 ## 选择模块
 
-- AI 应用开发或发布申请包：先读 [references/ai-applications.md](references/ai-applications.md)，开发前端时再读 [references/web-app-development.md](references/web-app-development.md)。使用 `scripts/agentcici_application.py check|package|validate|submit|draft|status`；本地打包成功不代表已提交、已发布或可自动安装。
+- AI 应用开发或发布申请包：先读 [references/ai-applications.md](references/ai-applications.md)，开发前端时再读 [references/web-app-development.md](references/web-app-development.md)。使用 `scripts/agentcici_application.py check|package|validate|submit|draft|status|list|get|publish|release`；本地打包成功不代表已提交、已发布或可自动安装。
 - 智能体/技能上传下载及知识库依赖：读 [references/resource-packages.md](references/resource-packages.md)。保留原生包，不用 CRUD 返回 JSON 冒充导出包；后台登录接口不能使用开发者 Token 冒充登录身份。
 - 智能体设计、CRUD、关联资源或编译发布：先读 [references/agents.md](references/agents.md)，实施时运行 `scripts/agentcici_manage.py agents ...`。
 - 调用已发布智能体：读 [references/agent-runtime-openapi.md](references/agent-runtime-openapi.md)。这套运行 API 使用 Agent API Key，不使用开发者密钥。
 - 技能设计、CRUD 或编译发布：先读 [references/skills.md](references/skills.md)，实施时运行 `scripts/agentcici_manage.py skills ...`。
 - MCP 服务设计、CRUD、工具发现与组织现有工具读取：先读 [references/mcp-tools.md](references/mcp-tools.md)，实施时运行 `scripts/agentcici_manage.py mcp ...` 或 `tools list`；工具只能读取并关联智能体，不单独创建。
+- 知识库管理、资料上传、索引与检索：读 [references/knowledge-bases.md](references/knowledge-bases.md)，使用 `scripts/agentcici_manage.py knowledge ...`；随后将真实库ID关联到智能体并编译发布。
 - 换票、scope、错误语义：读 [references/authentication.md](references/authentication.md)。
 
 只读取当前任务所需的参考文件。
@@ -153,4 +178,4 @@ python3 scripts/agentcici_manage.py agents bind-tools AGENT_ID --file /absolute/
 
 准备或发布 AI 应用时，先读 [清单与问答规范](references/application-manifest.md)。读取现有清单及客户已确认信息，运行 `check --manifest ...`，只问仍缺失或冲突的必填项，分组提问并将回答写回应用目录的清单。对象相关入口先用 CloudCC 开发技能查询实际对象，再让客户选择；不猜测对象 ID、已有资源 ref 或发布版本。不请求用户重复提供已确认信息。
 
-缺失项未补齐前可继续开发和只读检查，但不得上传或声称可发布。补齐后构建、打包、校验并展示实际清单与资源摘要。开发者权限仍只允许提交和创建草稿；平台上架由平台管理员执行，不增加开发者上架权限。
+缺失项未补齐前可继续开发和只读检查，但不得上传或声称可发布。补齐后构建、打包、校验并展示实际清单与资源摘要。开发者可按application.submit上传并创建本组织草稿，按application.publish发布本组织拥有的版本；平台应用发布与市场审核仍由平台管理员执行，不赋予跨组织或自动上架权限。

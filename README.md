@@ -11,7 +11,7 @@
 - 开发 AI Web 应用，生成 CloudCC 菜单、按钮或全局入口。
 - 准备、校验和提交 AI 应用发布申请包。
 
-当前版本：`1.5.9`
+当前版本：`1.6.3`
 
 ## 安装 Skill
 
@@ -24,6 +24,14 @@
 > 使用 $cc-aidev-agent-guidelines-common 查看当前组织的智能体。
 
 也可以直接描述 AgentCiCi 相关任务，由 Codex 自动选择本 Skill。
+
+## AI App开发
+
+按 [七阶段流程](references/development-workflow.md) 完成需求、设计、开发、本地联调、打包组织发布和CRM菜单系统测试。支持Web、对象/字段、自定义类，以及智能体、技能、知识库和MCP关联；分别配置AgentCiCi与CloudCC CRM开发凭据。新增知识库管理及组织应用发布需部署对应后端并授予scope，不能将本地工具更新视为线上接口已生效。
+
+## 多应用项目
+
+默认在一个项目文件夹中，通过 `applications/<appCode>/` 管理多个 AI 应用。每个应用有自己的清单、源码和发布产物，项目根目录共用AgentCiCi配置、CloudCC CLI配置和CRM缓存；应用源码和文档仍各自保存。CRM类通过 [共用配置适配入口](references/cloudcc-shared-config.md) 操作，无须改动CloudCC CLI。完整结构与管理规则见 [项目与多应用目录](references/application-manifest.md#项目与多应用目录)。已有项目保留其结构，不自动迁移。
 
 ## 登录 AgentCiCi
 

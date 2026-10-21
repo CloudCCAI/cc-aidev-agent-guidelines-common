@@ -13,7 +13,7 @@ import zipfile
 import urllib.request
 import urllib.error
 import uuid
-from agentcici_manage import Client
+from agentcici_manage import Client, NoCredentialRedirect
 
 LIMIT = 100 * 1024 * 1024
 FORMAT = 'agentcici-application-request'
@@ -75,6 +75,21 @@ def refs(items):
 
 def validate(files):
     manifest = json.loads(files['application.json'])
+    if manifest.get('formatVersion') == 2:
+        from application_business_resources import validate_resources
+        installation = manifest.get('installationManifest', {})
+        require(installation.get('schemaVersion') == 2, '业务资源安装清单需要schemaVersion=2')
+        require(set(manifest.get('sha256', {})) == set(files) - {'application.json'}
+                and all(digest(files[k]) == v for k, v in manifest['sha256'].items()), '文件摘要不匹配')
+        paths = validate_resources(manifest.get('cloudccResources'), files, installation)
+        baseline = json.loads(json.dumps(manifest))
+        baseline['formatVersion'] = baseline['installationManifest']['schemaVersion'] = 1
+        baseline.pop('cloudccResources')
+        remaining = {name: value for name, value in files.items() if name not in paths}
+        baseline['sha256'] = {name: digest(value) for name, value in remaining.items() if name != 'application.json'}
+        remaining['application.json'] = encode(baseline)
+        validate(remaining)
+        return manifest
     require(manifest.get('format') == FORMAT and manifest.get('formatVersion') == 1, '应用包格式不支持')
     require(re.fullmatch(r'[a-z][a-z0-9-]{1,63}', manifest.get('appCode', '')), '应用代码非法')
     require(re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', manifest.get('version', '')), '版本非法')
@@ -106,6 +121,29 @@ def validate(files):
                     and isinstance(authentication.get('targetPath'), str) and authentication['targetPath'].startswith('/') and not authentication['targetPath'].startswith('//')
                     and re.fullmatch(r'[a-z][a-z0-9_]{1,31}', authentication.get('ticketPrefix', ''))
                     and (not authentication.get('localeParam') or re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,31}', authentication['localeParam'])), '宿主认证配置无效')
+        servers = installation.get('mcpServers', [])
+        tools = installation.get('tools', [])
+        require(isinstance(servers, list) and len(servers) <= 30 and isinstance(tools, list) and len(tools) <= 100, 'MCP或工具声明无效')
+        mcp_refs, names, tool_refs = set(), set(), set()
+        for server in servers:
+            require(isinstance(server, dict) and set(server) == {'ref', 'name', 'description', 'transportType', 'url'}, 'MCP发布声明不能包含凭据或额外字段')
+            url = urlsplit(server['url'])
+            require(re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_-]{0,63}', server['ref'])
+                    and server['ref'] not in mcp_refs and isinstance(server['name'], str) and server['name'].strip()
+                    and server['name'] not in names and len(server['name']) <= 120
+                    and isinstance(server['description'], str) and len(server['description']) <= 2000
+                    and server['transportType'] == 'streamableHttp' and url.scheme == 'https'
+                    and url.hostname and not url.username and not url.password and not url.fragment
+                    and not url.query and len(server['url']) <= 512, 'MCP发布声明无效或地址携带凭据')
+            mcp_refs.add(server['ref']); names.add(server['name'])
+        for tool in tools:
+            require(isinstance(tool, dict) and re.fullmatch(r'[a-zA-Z][a-zA-Z0-9_-]{0,63}', tool.get('ref', ''))
+                    and tool['ref'] not in tool_refs and isinstance(tool.get('name'), str)
+                    and 0 < len(tool['name'].strip()) <= 160, '工具名称或ref无效')
+            expected = {'ref', 'name', 'source', 'mcpRef'} if tool.get('source') == 'mcp' else {'ref', 'name', 'source'}
+            require(set(tool) == expected and (tool.get('source') == 'builtin'
+                    or tool.get('source') == 'mcp' and tool.get('mcpRef') in mcp_refs), '工具来源或MCP关联无效')
+            tool_refs.add(tool['ref'])
         agent_runtime = installation.get('agentRuntime')
         if agent_runtime is not None:
             require(isinstance(agent_runtime, dict)
@@ -120,7 +158,8 @@ def validate(files):
     for name in site:
         path = pathlib.PurePosixPath(name)
         require(not any(p.startswith('.') or p == 'node_modules' for p in path.parts)
-                and path.suffix not in {'.map', '.pem', '.key'}, '站点包含禁止发布的文件')
+                and path.suffix not in {'.map', '.pem', '.key'}
+                and path.name not in {'cloudcc-agentcici.config.json', 'cloudcc-cli.config.json'}, '站点包含禁止发布的文件')
     skills = refs(manifest['skills'])
     agents = refs(manifest['agents'])
     knowledge = refs(manifest.get('knowledgeBases', []))
@@ -198,7 +237,8 @@ def package(source, output):
         if path.is_file():
             relative = path.relative_to(directory)
             require(not any(p.startswith('.') or p == 'node_modules' for p in relative.parts)
-                    and path.suffix not in {'.map', '.pem', '.key'}, '构建目录包含禁止发布的文件')
+                    and path.suffix not in {'.map', '.pem', '.key'}
+                    and path.name not in {'cloudcc-agentcici.config.json', 'cloudcc-cli.config.json'}, '构建目录包含禁止发布的文件')
             size += path.stat().st_size
             require(size <= LIMIT, '站点产物超过 100 MiB')
             site[relative.as_posix()] = path.read_bytes()
@@ -227,6 +267,17 @@ def package(source, output):
         files['cloudcc/menu.json'] = encode({'tabName': menu['tabName'], 'pname': menu['pname'], 'type': 'script',
             'functioncode': menu.get('functioncode') or (pathlib.Path(__file__).resolve().parent.parent / 'assets/application-menu.js').read_text(encoding='utf-8').replace('__APP_CODE__', json.dumps(config['appCode'])).replace('__SDK_URL__', json.dumps(menu.get('sdkUrl', 'https://uat.agentcici.com/sdk/agentcici-app@1.1.0.js')))})
     manifest['sha256'] = {name: digest(data) for name, data in files.items()}
+    if config.get('cloudccResources'):
+        manifest['formatVersion'] = 2
+        manifest['cloudccResources'] = config['cloudccResources']
+        require('installationManifest' in manifest, '业务资源需要安装清单')
+        manifest['installationManifest']['schemaVersion'] = 2
+        for resource in manifest['cloudccResources']:
+            path = local(resource['file'])
+            require(path.is_file() and path.stat().st_size <= LIMIT, '业务资源文件不存在或过大')
+            require(resource['file'] not in files, '业务资源文件重复')
+            files[resource['file']] = path.read_bytes()
+        manifest['sha256'] = {name: digest(value) for name, value in files.items()}
     files['application.json'] = encode(manifest)
     validate(files)
     data = zip_bytes(files)
@@ -244,6 +295,15 @@ def main():
     build = commands.add_parser('package')
     build.add_argument('--manifest', required=True)
     build.add_argument('--output', required=True)
+    release = commands.add_parser('release', help='打包、上传、创建草稿并发布为本组织可安装版本')
+    release.add_argument('--manifest', required=True)
+    release.add_argument('--output', required=True)
+    commands.add_parser('list', help='列出本组织开发的应用')
+    owned = commands.add_parser('get', help='查询本组织应用和版本状态')
+    owned.add_argument('app_code')
+    publish = commands.add_parser('publish', help='发布已上传的本组织版本')
+    publish.add_argument('app_code')
+    publish.add_argument('--version', required=True)
     preflight = commands.add_parser('check', help='列出源清单缺失必填项，供发布前问答')
     preflight.add_argument('--manifest', required=True)
     submit = commands.add_parser('submit', help='提交待审核申请，不直接发布')
@@ -256,7 +316,18 @@ def main():
     check.add_argument('file')
     args = parser.parse_args()
     try:
-        if args.command == 'check':
+        if args.command in ('list', 'get', 'publish'):
+            if args.command == 'list':
+                result = Client().request('GET', '/openapi/v1/management/ai-applications/owned')
+            else:
+                require(re.fullmatch(r'[a-z][a-z0-9-]{1,63}', args.app_code), '应用代码非法')
+                path = '/openapi/v1/management/ai-applications/' + args.app_code
+                if args.command == 'get':
+                    result = Client().request('GET', path)
+                else:
+                    require(re.fullmatch(r'[0-9]\.[0-9]\.[0-9]', args.version), '版本非法')
+                    result = Client().request('POST', path + '/versions/' + args.version + '/publish', {})
+        elif args.command == 'check':
             source = pathlib.Path(args.manifest).resolve()
             config = json.loads(source.read_text())
             absent = missing(config)
@@ -271,12 +342,14 @@ def main():
         elif args.command == 'package':
             result = package(args.manifest, args.output)
         else:
-            path = pathlib.Path(args.file)
+            if args.command == 'release':
+                package(args.manifest, args.output)
+            path = pathlib.Path(args.output if args.command == 'release' else args.file)
             require(path.stat().st_size <= LIMIT, '包过大')
             data = path.read_bytes()
             manifest = validate(read_zip(data))
             result = {'status': 'valid', 'appCode': manifest['appCode'], 'sha256': digest(data)}
-            if args.command == 'submit':
+            if args.command in ('submit', 'release'):
                 client = Client()
                 boundary = 'cici-' + uuid.uuid4().hex
                 body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="application.zip"\r\nContent-Type: application/zip\r\n\r\n'.encode()
@@ -285,7 +358,7 @@ def main():
                     data=body, method='POST', headers={'Authorization': 'Bearer ' + client.exchange(),
                     'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Accept': 'application/json'})
                 try:
-                    with urllib.request.urlopen(request, timeout=120) as response:
+                    with urllib.request.build_opener(NoCredentialRedirect()).open(request, timeout=120) as response:
                         envelope = json.load(response)
                 except urllib.error.HTTPError as error:
                     raise RuntimeError(f'申请提交返回 HTTP {error.code}；核对服务端版本与 application.submit 权限') from None
@@ -298,6 +371,13 @@ def main():
                     result['draft'] = client.request('POST', '/openapi/v1/management/application-requests/' + request_id + '/draft', {})
                 except (RuntimeError, OSError) as error:
                     raise RuntimeError(f'上传已成功，申请 ID={request_id}；草稿未确认创建：{error}。可用 draft {request_id} 重试') from None
+                if args.command == 'release':
+                    try:
+                        result['publication'] = client.request('POST', '/openapi/v1/management/ai-applications/'
+                            + manifest['appCode'] + '/versions/' + manifest['version'] + '/publish', {})
+                    except (RuntimeError, OSError):
+                        raise RuntimeError('上传及草稿创建已成功，组织发布未确认；请先 get ' + manifest['appCode']
+                            + ' 核实版本状态，再使用 publish 重试，不重新打包覆盖同版本') from None
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (ValueError, KeyError, TypeError, AttributeError, OSError, zipfile.BadZipFile, RuntimeError) as error:

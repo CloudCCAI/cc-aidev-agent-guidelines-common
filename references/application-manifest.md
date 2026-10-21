@@ -1,6 +1,43 @@
 # 资源清单与发布前问答
 
-每个应用一个独立目录，建议 applications/<appCode>/：application.json、src/、scripts/、构建目录dist/和产物release/。源码/清单纳入版本管理；dist/release忽略。保留旧版本产物用于追溯，不覆盖相同版本。
+## 项目与多应用目录
+
+默认使用一个项目根目录，通过 `applications/<appCode>/` 管理多个应用。新建的第一个应用也放在 `applications/` 下，后续应用并列添加；用户明确指定其他结构时遵循用户要求。接手已有项目先识别现有清单和目录，不自动搬迁或重建已有应用。
+
+```text
+项目根目录/
+├── cloudcc-agentcici.config.json        # AgentCiCi多环境凭据，Git忽略
+├── cloudcc-cli.config.json             # 多应用共用CRM配置，Git忽略
+├── .cloudcc-cache.json                 # 多应用共用CLI缓存，Git忽略
+├── .gitignore
+└── applications/
+    ├── customer-insight/
+    │   ├── application.json            # 该应用的源清单
+    │   ├── package.json                # 前端工具需要时创建
+    │   ├── docs/                       # 需求、设计、联调和系统测试记录
+    │   ├── backend/classes/           # CLI维护的该应用类源码
+    │   ├── cloudcc/metadata/          # 该应用对象/字段定义
+    │   ├── src/                        # 该应用源码
+    │   ├── scripts/                    # 按需放构建和验证脚本
+    │   ├── resources/                  # 有依赖时保存原生资源包
+    │   │   ├── assistant.ciciagent
+    │   │   └── analysis-skill.zip
+    │   ├── dist/                       # 静态构建结果，Git 忽略
+    │   └── release/                    # 带版本号的申请 ZIP，Git 忽略
+    └── contract-review/
+        ├── application.json
+        └── src/
+```
+
+- 每个应用有独立的 `application.json`、appCode、版本、构建产物和发布包。只创建实际需要的目录，不为无智能体或技能依赖的应用建立空资源目录；React、Vue 或原生前端沿用各自所需文件。
+- 项目根目录默认共用一份 `cloudcc-agentcici.config.json`，在其中管理 dev、uat、prod 等环境。首次登录在项目根目录执行，使用已安装技能脚本的绝对路径；从应用子目录调用时会向父级查找最近配置。如用户明确要求应用独立身份，可在该应用目录保存独立配置或通过 `AGENTCICI_CONFIG_PATH` 指定，避免无意创建配置覆盖项目共用身份。选择配置取决于当前工作目录或显式配置路径，与 `--manifest` 所指目录无关。
+- CloudCC CRM配置与缓存同样统一放项目根目录，不在应用内复制配置；对象/字段命令明确传根目录，类通过 [共用配置适配入口](cloudcc-shared-config.md) 操作，真实源码保留在应用backend/classes。不要直接在根目录创建类、不要迁移应用代码。
+- 清单中 `outputDir`、资源 `file` 等文件路径相对于该清单所在应用目录解析，例如 `dist`、`resources/assistant.ciciagent`。打包输入必须位于该应用目录内，不能通过 `../` 或符号链接跨应用引用；确需复用的原生资源包在各应用目录内保留其完整原包，并在各自清单声明。
+- 智能体 `.ciciagent` 和技能 ZIP 保留平台导出的完整原包；`resources/` 为建议名称，实际路径以清单为准。CloudCC 对象、字段定义和自定义类源码按业务需要保存在对应应用内；能否随包安装须核对目标能力，见 [业务资源交付](ai-applications.md#cloudcc-业务资源交付)。
+- 源码、应用清单、必要构建脚本及不含真实凭据的配置示例纳入版本管理；真实配置、`node_modules/`、各应用的 `dist/` 和 `release/` 加入 Git 忽略。真实密钥不得进入前端构建目录或发布包。
+- 发布产物在各自 `release/` 下按版本保存，如 `customer-insight-1.0.0.zip`；旧版本保留用于追溯，不覆盖同版本文件。
+- 开发技能安装目录独立于业务项目，应用源码、登录配置和产物都不写入技能目录。本技能目前没有项目初始化命令，AI 按上述规则创建和维护目录，不杜撰脚手架命令。
+
 
 ## 必填与条件项
 

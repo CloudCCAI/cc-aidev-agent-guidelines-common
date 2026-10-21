@@ -20,6 +20,7 @@ Content-Type: application/json
 | 智能体 | `agent.read` | `agent.write` | `agent.delete` |
 | 技能 | `skill.read` | `skill.write` | `skill.delete` |
 | MCP 服务 | `mcp.read` | `mcp.write` | `mcp.delete` |
+| 知识库 | `knowledge.read` | `knowledge.write` | `knowledge.delete` |
 
 ## 错误语义
 
@@ -33,7 +34,7 @@ Content-Type: application/json
 
 ## AI 应用申请
 
-提交 ZIP 需要 application.submit；查询、下载本组织申请需要 application.read。已有凭据不会自动新增权限，组织管理员可在开发者管理中编辑权限。目标环境需已部署申请接收接口；这两个 scope 不授予平台审核、发布或跨组织访问权限。OSS 凭据只由后端配置，不使用 org 开发者凭据作为 OSS 密钥。
+提交 ZIP 需要 application.submit；查询、下载本组织申请需要 application.read。已有凭据不会自动新增权限，组织管理员可在开发者管理中编辑权限。目标环境需已部署申请接收接口；本组织应用发布另需 application.publish，不授予平台审核、平台应用发布或跨组织访问权限。OSS 凭据只由后端配置，不使用 org 开发者凭据作为 OSS 密钥。
 
 ## Base64 登录与多环境持久化（1.5.9）
 

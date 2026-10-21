@@ -4,13 +4,17 @@
 
 ## 提交与权限
 
-- `check` 检查源清单缺失字段；`package` 构建申请 ZIP；`validate` 校验；`submit` 上传并尝试创建草稿；`draft` 单独重试草稿；`status` 查询申请。
+- `check` 检查源清单；`package` 打包；`validate` 校验v1/v2包；`submit` 上传并创建草稿；`draft` 重试草稿；`status` 查询申请；`list/get` 管理本组织应用与版本；`publish` 发布已上传版本；`release` 串联打包、上传、草稿和组织发布。
 - POST `/openapi/v1/management/application-requests`，multipart file，需要 application.submit。
 - GET `/openapi/v1/management/application-requests/{id}` 与 `/{id}/download`，需要 application.read，只允许本组织。
-- POST `/openapi/v1/management/application-requests/{id}/draft`，需要 application.submit。开发者只能创建本组织所有应用的草稿，不能认领平台应用或其他组织应用，不能上架。
+- POST `/openapi/v1/management/application-requests/{id}/draft`，需要 application.submit。开发者只能创建本组织拥有应用的草稿，不能认领平台应用或其他组织应用。组织发布使用下述独立权限，不自动上架市场。
 - 平台管理员可用 POST `/platform/application-requests/{id}/draft` 将已提交包建立为平台应用草稿（仅新平台应用或原平台所有应用）。再走平台现有版本发布接口；开发者Token不能调用这两个平台操作。
 - 同 org + ZIP SHA256 幂等；结果未知时重交原包，不重新打包冒充同一次重试。相同版本不可用不同包覆盖，已发布版本不可修改。
 - 对既有平台思思的开发者提交可能上传成功、自动草稿被拒绝；保留申请ID交平台管理员，不更改appCode所有权或扩大开发者权限。
+
+- GET `/openapi/v1/management/ai-applications/owned` 列出本组织开发的应用，GET `/{appCode}` 查询本组织拥有的应用及版本，需application.read；与已有“可安装目录”列表不同。
+- POST `/openapi/v1/management/ai-applications/{appCode}/versions/{version}/publish` 需application.publish，复用组织发布的所有权、版本和制品校验，成功返回组织应用及版本状态。已有凭据需组织管理员明确增加该scope，不自动增权。
+- 新API必须部署对应后端后才能调用；`release`失败区分上传、草稿、发布阶段。上传/发布结果未知先查询，不能重新打包覆盖同版本；可复用原ZIP调用submit、或单独draft/publish恢复。
 
 包存储、OSS和最多5个版本清理见 [存储规范](application-storage.md)。开发者不需要OSS密钥。申请SUBMITTED、草稿DRAFT和市场已发布是不同状态。
 
@@ -28,7 +32,7 @@
 
 ## 包内协议与兼容
 
-外层仍为 `format=agentcici-application-request, formatVersion=1`。含 application.json、单个 site.zip（根层index.html）、自定义智能体 agents/<ref>.ciciagent、独立技能 skills/<ref>.zip。新清单入口代码写入 installationManifest.steps；仅旧menu格式额外生成 cloudcc/menu.json。sha256覆盖所有外层文件，application.json自身除外，原生包字节不变。
+外层 `format=agentcici-application-request`；不含CRM业务资源时为formatVersion=1，含对象/字段/类时为formatVersion=2。含 application.json、单个 site.zip（根层index.html）、自定义智能体 agents/<ref>.ciciagent、独立技能 skills/<ref>.zip。新清单入口代码写入 installationManifest.steps；仅旧menu格式额外生成 cloudcc/menu.json。sha256覆盖所有外层文件，application.json自身除外，原生包字节不变。
 
 平台智能体使用可选platformAgent={ref}，agents为空；不打包它已有的托管技能/知识库。不需要智能体时agents为空且无platformAgent。自定义智能体仍完整校验导出依赖映射，不支持工具依赖或托管技能伪造导出。知识库定义至少ref/name，客户文档不随包上传。
 
@@ -46,9 +50,27 @@ connectedApplications是可选布尔开关，缺省为true，转换为requiresCo
 
 第三方应用仍以一个 Web 应用为主体。需要存储时提供自定义对象及字段定义，需要业务逻辑时提供自定义类源码；Web 按 [调用规范](web-app-development.md#web-调用自定义类) 请求类，由类操作对象。明确每项资源的 API Name 和依赖顺序，对象先于字段、依赖资源先于调用它们的类；内部 ID 由安装 org 解析，业务数据与凭据不打包。
 
-上文 `formatVersion=1` 和常用 `package` 命令描述现有 Web/AI 资源流程，不能据此声称已经打包业务资源。业务资源使用外层 `formatVersion=2`、`cloudccResources` 声明及 `installationManifest.schemaVersion=2`。执行前核对打包工具、发布接收端和 setup-svc 是否实际支持；当前技能中的原有打包脚本不自动生成这些业务资源，缺少支持时明确列出交付定义、源码和阻塞，不静默忽略它们。
+上文 `formatVersion=1` 和常用 `package` 命令描述现有 Web/AI 资源流程，不能据此声称已经打包业务资源。业务资源使用外层 `formatVersion=2`、`cloudccResources` 声明及 `installationManifest.schemaVersion=2`。执行前核对打包工具、发布接收端和 setup-svc 是否实际支持；技能打包器现支持从源清单cloudccResources读取object/field/class，写入v2包并验证资源白名单、路径、依赖和摘要；定义须遵循安装器允许的字段，不直接打包MetadataService plan或源org ID。服务端或setup-svc缺少支持时明确列出阻塞，不静默忽略资源。
 
 业务资源安装归入当前 AI 应用安装流程，由 setup-svc 的原生能力创建对象、字段和类；不依赖 MetadataService，也不复用传统软件包安装器。schemaVersion=2 使用安装计划与服务端操作状态，不能套用前述旧 `/install` 流程或首次失败自动删除规则。升级、恢复及清理以目标环境已提供的能力为准；不得推断可自动修改/删除已有结构与类源码，或删除客户业务数据。
+
+### 源清单业务资源示例
+
+以下仅是完整application.json中的资源片段，Web、入口和AI依赖仍按其他章节配置：
+
+```json
+{
+  "cloudccResources": [
+    {"key":"record","kind":"object","file":"cloudcc/metadata/Record.json"},
+    {"key":"record-content","kind":"field","file":"cloudcc/metadata/content.json","dependsOn":["record"]},
+    {"key":"record-service","kind":"class","apiName":"RecordService","label":"记录服务","file":"cloudcc/backend/classes/RecordService.java","dependsOn":["record-content"]}
+  ]
+}
+```
+
+对象JSON可用apiName/label/nameLabel/dataType/showFormat/beginIndex/remark；字段JSON可用apiName/objectApiName/label/fieldType/length/decimalPlaces/lookupObjectApiName/childrelationName/remark。支持字段类型S/N/P/c/C/D/T/B/E/U/Y/M，平台其他字段能力不等于本安装器已支持；关系字段必须有目标API名和childrelationName，数值精度按平台限制。开发定义超出此范围时明确列出差异，不擅自丢字段。类交付文件是通过CLI创建并验证后的SOURCE内容，保留开发目录中的原始CLI文件，不打包其config.json中的远端ID。
+
+MCP和工具声明在mcpServers/tools，工具依赖用agent.tools中的bindingRef→ref映射，技能与知识依赖同样按原生导出ref映射。MCP/工具配置见 [MCP模块](mcp-tools.md)，不要把源服务响应（含认证字段）整段复制进发布清单。
 
 ## 常用命令
 
@@ -58,4 +80,8 @@ python3 scripts/agentcici_application.py package --manifest /project/application
 python3 scripts/agentcici_application.py validate /project/release/app-1.0.0.zip
 python3 scripts/agentcici_application.py submit /project/release/app-1.0.0.zip
 python3 scripts/agentcici_application.py status REQUEST_ID
+python3 scripts/agentcici_application.py list
+python3 scripts/agentcici_application.py get app-code
+python3 scripts/agentcici_application.py publish app-code --version 1.0.0
+python3 scripts/agentcici_application.py release --manifest /project/applications/app-code/application.json --output /project/applications/app-code/release/app-code-1.0.0.zip
 ```
