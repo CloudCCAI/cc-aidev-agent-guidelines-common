@@ -11,7 +11,7 @@
 - 开发 AI Web 应用，生成 CloudCC 菜单、按钮或全局入口。
 - 准备、校验和提交 AI 应用发布申请包。
 
-当前版本：`1.5.8`
+当前版本：`1.5.9`
 
 ## 安装 Skill
 
@@ -33,7 +33,9 @@
 
 > 这是 AgentCiCi 后台复制的 AI 登录信息，请帮我登录并记住登录状态。
 
-Skill 会解析这段信息、向服务端验证，成功后再安全保存。macOS 下 Secret 保存在钥匙串中，不会写入项目文件。
+Skill 会解析并验证登录信息，成功后把解码后的地址、Client ID 和 Secret 直接写入项目 `cloudcc-agentcici.config.json`。通过 `use` 选择当前环境，可同时保存 dev、uat、prod 等多组凭据。文件自动加入 `.gitignore`，POSIX 权限设为 `0600`；Token 不落盘。
+
+可以直接告诉 Codex：“把这组登录信息保存为 uat 环境”或“切换到 prod 环境”。旧版钥匙串登录需要重新 login 写入新配置，旧记录保留。详细命令见 [认证说明](references/authentication.md)。
 
 其他常用说法：
 

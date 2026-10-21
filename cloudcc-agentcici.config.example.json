@@ -1,0 +1,18 @@
+{
+  "use": "dev",
+  "dev": {
+    "baseUrl": "http://localhost:8080",
+    "clientId": "请填写开发者 Client ID",
+    "clientSecret": "请填写解码后的 Client Secret"
+  },
+  "uat": {
+    "baseUrl": "https://uat.example.com",
+    "clientId": "请填写开发者 Client ID",
+    "clientSecret": "请填写解码后的 Client Secret"
+  },
+  "prod": {
+    "baseUrl": "https://example.com",
+    "clientId": "请填写开发者 Client ID",
+    "clientSecret": "请填写解码后的 Client Secret"
+  }
+}

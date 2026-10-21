@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Base64 login and macOS Keychain persistence. Never execute decoded text."""
+"""Base64 login and project-local multi-environment credentials."""
 import argparse
 import base64
 import binascii
@@ -9,22 +9,33 @@ import os
 from pathlib import Path
 import re
 import shlex
-import subprocess
 import sys
 import tempfile
-import uuid
 from urllib.parse import urlsplit
 
 NAMES = ('AGENTCICI_BASE_URL', 'AGENTCICI_CLIENT_ID', 'AGENTCICI_CLIENT_SECRET')
-SERVICE = 'AgentCiCi Developer Login'
+CONFIG_NAME = 'cloudcc-agentcici.config.json'
 
 
 def config_path():
-    profile = os.environ.get('AGENTCICI_LOGIN_PROFILE', '')
-    if profile and not re.fullmatch(r'[A-Za-z0-9_-]+', profile):
-        raise RuntimeError('登录环境名称只能包含字母、数字、下划线和连字符')
-    filename = f'login-{profile}.json' if profile else 'login.json'
-    return Path.home() / '.config' / 'agentcici' / filename
+    explicit = os.environ.get('AGENTCICI_CONFIG_PATH')
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    current = Path.cwd()
+    for directory in (current, *current.parents):
+        path = directory / CONFIG_NAME
+        if path.is_file():
+            return path
+    return current / CONFIG_NAME
+
+
+def selected_env(root, env=None):
+    name = env or os.environ.get('AGENTCICI_LOGIN_PROFILE') or root.get('use')
+    if not name and not root:
+        name = 'dev'
+    if not isinstance(name, str) or name == 'use' or not re.fullmatch(r'[A-Za-z0-9_-]+', name):
+        raise RuntimeError('配置 use 或环境名称无效；仅允许字母、数字、下划线和连字符，不能使用 use')
+    return name
 
 
 def decode_login(encoded):
@@ -39,38 +50,68 @@ def decode_login(encoded):
             if tokens[i] != 'export' or not separator or name not in NAMES or name in values or not value or '\x00' in value:
                 raise ValueError()
             values[name] = value
-        url = urlsplit(values[NAMES[0]])
-        if (not url.hostname or url.username or url.password or url.query or url.fragment
-                or url.path not in ('', '/') or (url.scheme != 'https' and not
-                    (url.scheme == 'http' and url.hostname in ('localhost', '127.0.0.1', '::1')))):
-            raise ValueError()
-        values[NAMES[0]] = values[NAMES[0]].rstrip('/')
-        return values
+        return validate_values(values)
     except (ValueError, KeyError, UnicodeError, binascii.Error):
         raise RuntimeError('登录信息无效，请复制完整 Base64 信息；地址必须为 HTTPS 或本机开发地址') from None
 
 
-def keychain(action, account, secret=None):
-    if sys.platform != 'darwin':
-        raise RuntimeError('持久登录目前支持 macOS 钥匙串；其他系统请使用三项环境变量')
-    args = ['/usr/bin/security', action, '-s', SERVICE, '-a', account]
-    if action == 'add-generic-password':
-        args += ['-U', '-w', secret]
-    elif action == 'find-generic-password':
-        args += ['-w']
-    result = subprocess.run(args, capture_output=True, text=True)
-    if result.returncode:
-        raise RuntimeError('无法访问 AgentCiCi 钥匙串项，请检查系统钥匙串授权')
-    return result.stdout[:-1] if result.stdout.endswith('\n') else result.stdout
+def validate_values(values):
+    try:
+        url = urlsplit(values[NAMES[0]])
+        if (not all(isinstance(values[key], str) and values[key].strip() and '\x00' not in values[key] for key in NAMES)
+                or not url.hostname or url.username or url.password or url.query or url.fragment
+                or url.path not in ('', '/') or (url.scheme != 'https' and not
+                    (url.scheme == 'http' and url.hostname in ('localhost', '127.0.0.1', '::1')))):
+            raise ValueError()
+        return {**values, NAMES[0]: values[NAMES[0]].rstrip('/')}
+    except (ValueError, KeyError, TypeError):
+        raise RuntimeError('登录信息无效，地址必须为 HTTPS 或本机开发地址，且三项凭据不能为空') from None
 
 
 def read_config():
     try:
-        return json.loads(config_path().read_text())
+        root = json.loads(config_path().read_text(encoding='utf-8'))
+        if not isinstance(root, dict) or (root and (not isinstance(root.get('use'), str) or not isinstance(root.get(root['use']), dict))):
+            raise ValueError()
+        return root
     except FileNotFoundError:
-        return None
+        return {}
     except (ValueError, OSError):
-        raise RuntimeError('本地登录配置无法读取，请重新登录') from None
+        raise RuntimeError('本地登录配置无法读取，请检查 cloudcc-agentcici.config.json') from None
+
+
+def saved_identity(root, env):
+    saved = root.get(env)
+    if not isinstance(saved, dict) or not all(isinstance(saved.get(k), str) and saved[k].strip()
+                                             for k in ('baseUrl', 'clientId', 'clientSecret')):
+        raise RuntimeError('指定环境不存在或凭据不完整，请先 login --env 环境名')
+    return validate_values(dict(zip(NAMES, (saved[field] for field in ('baseUrl', 'clientId', 'clientSecret')))))
+
+
+def write_config(root):
+    path = config_path()
+    temporary = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        ignore = path.parent / '.gitignore'
+        existing = ignore.read_text(encoding='utf-8') if ignore.exists() else ''
+        rules = ['/' + path.name, '.cloudcc-agentcici-*.tmp']
+        missing = [rule for rule in rules if rule not in existing.splitlines()]
+        if missing:
+            with ignore.open('a', encoding='utf-8') as stream:
+                stream.write(('\n' if existing and not existing.endswith('\n') else '') + '\n'.join(missing) + '\n')
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                         prefix='.cloudcc-agentcici-', suffix='.tmp', delete=False) as stream:
+            temporary = Path(stream.name)
+            os.chmod(temporary, 0o600)
+            json.dump(root, stream, ensure_ascii=False, indent=2)
+            stream.write('\n')
+        os.replace(temporary, path)
+    except OSError:
+        raise RuntimeError('无法保存登录配置') from None
+    finally:
+        if temporary:
+            temporary.unlink(missing_ok=True)
 
 
 def credentials():
@@ -78,68 +119,76 @@ def credentials():
         if not all(os.environ.get(name) for name in NAMES):
             raise RuntimeError('环境变量登录必须同时提供地址、Client ID 和 Client Secret；不与已保存身份混用')
         return {name: os.environ[name] for name in NAMES}
-    saved = read_config()
-    if not saved:
+    root = read_config()
+    if not root:
         raise RuntimeError('尚未登录，请运行 agentcici_auth.py login 并输入 Base64 登录信息')
-    return {NAMES[0]: saved['baseUrl'], NAMES[1]: saved['clientId'], NAMES[2]: keychain('find-generic-password', saved['account'])}
+    return saved_identity(root, selected_env(root))
 
 
-def login(encoded):
+def login(encoded, env=None):
     from agentcici_manage import Client
     values = decode_login(encoded)
-    if sys.platform != 'darwin':
-        raise RuntimeError('持久登录目前支持 macOS 钥匙串')
-    client = Client(values)
+    root = read_config()
+    name = selected_env(root, env)
     try:
-        client.exchange()
+        Client(values).exchange()
     except Exception:
         raise RuntimeError('登录验证失败；请检查地址、凭据状态与网络，原登录配置保持不变') from None
-    old = read_config()
-    account = uuid.uuid4().hex
-    keychain('add-generic-password', account, values[NAMES[2]])
-    path = config_path()
-    temporary = None
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
-            temporary = Path(stream.name)
-            os.chmod(temporary, 0o600)
-            json.dump({'baseUrl': values[NAMES[0]], 'clientId': values[NAMES[1]], 'account': account}, stream)
-        os.replace(temporary, path)
-    except Exception:
-        if temporary:
-            temporary.unlink(missing_ok=True)
-        keychain('delete-generic-password', account)
-        raise RuntimeError('无法保存登录配置') from None
-    if old:
-        try:
-            keychain('delete-generic-password', old['account'])
-        except RuntimeError:
-            print('新登录已保存；旧钥匙串项未清理，可在钥匙串访问中移除', file=sys.stderr)
-    return {'status': 'logged_in', 'baseUrl': values[NAMES[0]], 'clientId': values[NAMES[1]]}
+    root[name] = dict(zip(('baseUrl', 'clientId', 'clientSecret'), (values[key] for key in NAMES)))
+    root['use'] = name
+    write_config(root)
+    return {'status': 'logged_in', 'env': name, 'configPath': str(config_path()),
+            'baseUrl': values[NAMES[0]], 'clientId': values[NAMES[1]]}
+
+
+def local_command(command, env=None):
+    root = read_config()
+    name = selected_env(root, env)
+    if not root:
+        if command == 'use':
+            raise RuntimeError('指定环境不存在，请先 login --env 环境名')
+        return {'status': 'not_logged_in', 'env': name, 'configPath': str(config_path())}
+    saved_identity(root, name)
+    if command == 'logout':
+        del root[name]
+        if root['use'] == name:
+            remaining = [key for key in root if key != 'use']
+            if remaining:
+                root['use'] = remaining[0]
+            else:
+                config_path().unlink()
+                return {'status': 'not_logged_in', 'env': name, 'configPath': str(config_path())}
+        write_config(root)
+        return {'status': 'not_logged_in', 'env': name, 'configPath': str(config_path())}
+    if command == 'use':
+        root['use'] = name
+        write_config(root)
+    saved = root[name]
+    return {'status': 'saved', 'env': name, 'configPath': str(config_path()),
+            'baseUrl': saved['baseUrl'], 'clientId': saved['clientId']}
 
 
 def main():
-    parser = argparse.ArgumentParser(description='使用复制的 Base64 信息登录并保存到 macOS 钥匙串')
-    parser.add_argument('command', choices=['login', 'status', 'logout'])
+    parser = argparse.ArgumentParser(description='将解码后的开发者凭据保存到多环境项目配置')
+    parser.add_argument('command', choices=['login', 'status', 'logout', 'use'])
+    parser.add_argument('environment', nargs='?', help='use 命令的目标环境')
+    parser.add_argument('--env', help='本次认证命令使用的环境')
     args = parser.parse_args()
+    if args.environment and (args.command != 'use' or args.env):
+        parser.error('只有 use 支持位置环境参数，且不能与 --env 同时使用')
+    if args.command == 'use' and not (args.environment or args.env):
+        parser.error('use 必须指定目标环境')
     try:
+        env = args.env or args.environment
         if args.command == 'login':
             encoded = getpass.getpass('Base64 登录信息（输入不回显）：') if sys.stdin.isatty() else sys.stdin.read()
-            result = login(encoded)
+            result = login(encoded, env)
         else:
-            saved = read_config()
-            if args.command == 'logout' and saved:
-                keychain('delete-generic-password', saved['account'])
-                config_path().unlink()
-                saved = None
-            result = {'status': 'saved' if saved else 'not_logged_in'}
-            if saved:
-                result.update(baseUrl=saved['baseUrl'], clientId=saved['clientId'])
+            result = local_command(args.command, env)
         print(json.dumps(result, ensure_ascii=False))
         return 0
     except (RuntimeError, OSError) as error:
-        print(str(error), file=sys.stderr)
+        print(str(error) if isinstance(error, RuntimeError) else '本地登录配置操作失败', file=sys.stderr)
         return 1
 
 

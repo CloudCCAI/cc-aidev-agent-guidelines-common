@@ -1,2 +1,5 @@
 __pycache__/
 *.py[cod]
+
+cloudcc-agentcici.config.json
+.cloudcc-agentcici-*.tmp

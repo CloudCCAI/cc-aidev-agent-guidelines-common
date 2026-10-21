@@ -35,14 +35,39 @@ Content-Type: application/json
 
 提交 ZIP 需要 application.submit；查询、下载本组织申请需要 application.read。已有凭据不会自动新增权限，组织管理员可在开发者管理中编辑权限。目标环境需已部署申请接收接口；这两个 scope 不授予平台审核、发布或跨组织访问权限。OSS 凭据只由后端配置，不使用 org 开发者凭据作为 OSS 密钥。
 
-## Base64 登录与持久化（1.1.0）
+## Base64 登录与多环境持久化（1.5.9）
 
-运行 `python3 scripts/agentcici_auth.py login`，粘贴后台复制的 Base64 文本，交互输入不回显；自动化调用可通过标准输入提供，禁止将原文写入临时文件、命令参数或日志。输入被严格解析为 AGENTCICI_BASE_URL、AGENTCICI_CLIENT_ID、AGENTCICI_CLIENT_SECRET 三条 export，支持 UTF-8 与 shell 引号，但不执行解码内容。只接受 HTTPS origin 或 localhost/127.0.0.1/::1 的 HTTP 开发地址，拒绝重定向换票。
+在用户项目目录运行 `python3 /技能绝对路径/scripts/agentcici_auth.py login --env uat`，粘贴后台复制的 Base64 文本，交互输入不回显；自动化调用通过标准输入提供，不将原文写入临时文件、命令参数或日志。输入严格解析为 AGENTCICI_BASE_URL、AGENTCICI_CLIENT_ID、AGENTCICI_CLIENT_SECRET 三条 export，不执行解码内容。只接受 HTTPS origin 或 localhost/127.0.0.1/::1 的 HTTP 开发地址，拒绝重定向换票。
 
-登录成功后 Secret 存在 macOS 登录钥匙串（服务名 AgentCiCi Developer Login）；普通配置 `~/.config/agentcici/login.json` 权限 600，只包含地址、Client ID、随机钥匙串账号。新登录验证失败不覆盖旧登录。一个本地用户默认保存一个当前身份，切换组织使用该组织的新登录信息。不得根据 Client ID 猜测组织。
+先调用开发者换票接口验证，成功后把解码后的三项凭据直接保存到 `cloudcc-agentcici.config.json`，结构参考随包提供的 `cloudcc-agentcici.config.example.json`：
 
-status 不读取或显示 Secret，只报告保存状态。logout 删除钥匙串项和配置，不撤销远程凭据；如果仍设置三项环境变量，命令仍会使用环境变量。钥匙串被锁定/授权拒绝时明确报错，不回退到明文文件。服务端停用/轮换密钥后，重新复制并 login；应用命令发起远程写入失败后不要自动重试以掩盖鉴权错误。
+```json
+{
+  "use": "uat",
+  "dev": {
+    "baseUrl": "http://localhost:8080",
+    "clientId": "示例开发者ID",
+    "clientSecret": "示例开发者Secret"
+  },
+  "uat": {
+    "baseUrl": "https://uat.example.com",
+    "clientId": "示例开发者ID",
+    "clientSecret": "示例开发者Secret"
+  }
+}
+```
 
-需要同时保存多个环境时，默认登录仍使用 `login.json`；设置 `AGENTCICI_LOGIN_PROFILE=prod` 后，登录、状态和管理命令使用独立的 `login-prod.json`。Secret 仍保存在同一个 macOS 登录钥匙串，配置文件只保存钥匙串引用。环境名称仅允许字母、数字、下划线和连字符。
+配置从当前工作目录向父级查找最近文件，没有时登录创建在当前目录；可以设置 `AGENTCICI_CONFIG_PATH` 明确指定完整路径。不要在技能安装目录登录，避免将业务凭据写入分发包。认证命令 `--env` 优先于 `AGENTCICI_LOGIN_PROFILE`，后者优先于文件 `use`；首次登录默认 `dev`。环境名只允许字母、数字、下划线和连字符，保留字段 `use` 不可作为环境名。同一部署的不同组织可用不同环境名称保存，不能根据 Client ID 猜测组织。
 
-管理命令与应用 submit/status 共享此登录读取逻辑；本地 package/validate 不需要登录。Base64 是编码，不改变这些数据作为凭据的处理方式。
+```bash
+python3 /技能绝对路径/scripts/agentcici_auth.py login --env uat
+python3 /技能绝对路径/scripts/agentcici_auth.py use uat
+python3 /技能绝对路径/scripts/agentcici_auth.py status
+python3 /技能绝对路径/scripts/agentcici_auth.py logout --env uat
+```
+
+新登录验证失败不覆盖旧文件；成功时只替换指定环境并更新 `use`，保留其他环境。`use` 验证环境存在后仅切换本地配置，不发送网络请求。保存采用同目录临时文件和原子替换，POSIX 权限 `0600`，自动将配置名及临时文件加入同目录 `.gitignore`。整个文件按凭据处理，不提交、不打包、不回显；Base64 仅是编码，落盘保存的是解码后的原始值，短期 Token 不落盘。
+
+status 只报告本地保存状态、选中环境、地址、Client ID 和配置路径，不代表服务端凭据仍有效。logout 仅删除选中环境，不撤销远程凭据；删除当前环境后自动选择剩余环境，删除最后一个环境时移除配置文件。若仍设置三项凭据环境变量，管理命令仍优先使用环境变量；部分变量报错，不与文件混用。指定环境缺失、配置损坏或凭据不完整时明确报错，不回退到其他环境。
+
+旧 `~/.config/agentcici/login.json`、`login-*.json` 和系统钥匙串保持原样，新版不再读取它们；需要使用旧身份时重新复制登录信息，在目标项目执行 login。管理命令与应用 submit/status 共用新配置读取逻辑；本地 package/validate 不需要登录。服务端停用或轮换密钥后重新 login，远程写入失败不自动重试以掩盖鉴权错误。

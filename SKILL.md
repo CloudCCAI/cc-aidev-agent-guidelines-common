@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.5.8"
+  version: "1.5.9"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.5.8`。
+当前技能版本：`1.5.9`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -79,13 +79,15 @@ script.src = url.href;
 
 ## 前置配置
 
-优先使用管理后台“复制 AI 登录信息”得到的 Base64 文本。收到这类文本或用户要求登录/记住登录时，先读 [references/authentication.md](references/authentication.md)，通过 `python3 scripts/agentcici_auth.py login` 的标准输入或不回显交互输入传入，不把真实值写入命令参数、项目文件或回答。
+优先使用管理后台“复制 AI 登录信息”得到的 Base64 文本。收到这类文本或用户要求登录/记住登录时，先读 [references/authentication.md](references/authentication.md)，通过 `python3 scripts/agentcici_auth.py login` 的标准输入或不回显交互输入传入，不把真实值写入命令参数、日志或回答；仅允许认证脚本写入下述本机凭据配置。
 
 - Base64 解码后是三项 export 声明，脚本按数据解析，绝不 source/eval/执行它。
-- 登录先调用 `/openapi/v1/developer/token` 验证，成功才保存。macOS 使用钥匙串保存 Secret，`~/.config/agentcici/login.json` 仅保存地址、Client ID 和钥匙串引用。
-- 下次管理或应用提交命令自动读取保存的身份，并自动换取短期 Token；Token 只在进程内缓存。
-- `python3 scripts/agentcici_auth.py status` 查看保存状态（不代表服务端凭据仍有效）；`logout` 清除本机保存信息，不撤销服务端凭据。
-- 环境变量方式仍可用，必须同时设置 AGENTCICI_BASE_URL、AGENTCICI_CLIENT_ID、AGENTCICI_CLIENT_SECRET；优先于保存身份，禁止混合两组身份字段。非 macOS 暂用环境变量，不静默明文落盘。
+- 登录先调用 `/openapi/v1/developer/token` 验证，成功才将解码后的 `baseUrl`、`clientId`、`clientSecret` 直接保存到项目 `cloudcc-agentcici.config.json`；顶层 `use` 选择环境，每个环境独立保存凭据，不依赖系统钥匙串。
+- 配置从当前目录向父级查找最近文件；未找到时登录在当前目录创建。可用 `AGENTCICI_CONFIG_PATH` 指定完整路径。操作前确保工作目录或显式路径指向用户目标项目，不在技能安装目录保存业务凭据。
+- `login --env uat` 保存并切换到该环境，`use uat` 切换已有环境；不指定时沿用当前环境，首次为 `dev`。`AGENTCICI_LOGIN_PROFILE` 可覆盖文件 `use`，认证命令 `--env` 优先级最高。
+- 管理与应用提交命令自动读取同一配置并换取短期 Token，Token 只在进程内缓存。`status` 不输出 Secret；`logout --env uat` 仅移除该环境，不撤销服务端凭据。
+- 保存时设置 POSIX 文件权限 `0600`，自动将配置及临时文件加入同目录 `.gitignore`；真实配置不提交、不打包、不回显。旧 `login.json` / `login-*.json` 及钥匙串不自动迁移，重新 login 写入新格式。
+- 环境变量方式仍可用，必须同时设置 AGENTCICI_BASE_URL、AGENTCICI_CLIENT_ID、AGENTCICI_CLIENT_SECRET；优先于保存身份，禁止混合两组身份字段。
 - 用户未提供登录信息时先检查保存状态；缺少时引导复制，不要求每次重新提供密钥。
 - 管理 OpenAPI 不使用 Keycloak，也不接受单智能体运行 API Key。Secret 和 Base64 原文均按凭据处理，不写日志。
 
