@@ -39,9 +39,11 @@ format使用相同入口，可显式--write/--check，缺省只检查。创建�
 /installed/cloudcc/tools/bin/cloudcc doctor provider /project
 /installed/cloudcc/tools/bin/cloudcc use config dev /project
 /installed/cloudcc/tools/bin/cloudcc plan msapi /project fields @/project/applications/story-expander/cloudcc/metadata/content.json create
+/installed/cloudcc/tools/bin/cloudcc apply msapi /project PLAN_ID
+/installed/cloudcc/tools/bin/cloudcc get fields /project OBJECT_API_NAME
 ```
 
-plan只是计划，真实执行继续按专用技能apply规则。元数据输入文件可位于应用内，使用绝对路径，不能因配置位于根目录就移动定义。应用打包继续从该应用目录读取资源，不需要从根目录跨界导入源码。
+`PLAN_ID` 替换为本次返回的真实计划 ID，`OBJECT_API_NAME` 替换为字段定义所属的对象 API 名；核对计划后执行 apply，再回读字段。plan只是计划，真实执行继续按专用技能apply规则。元数据输入文件可位于应用内，使用绝对路径，不能因配置位于根目录就移动定义。应用打包继续从该应用目录读取资源，不需要从根目录跨界导入源码。
 
 ## 启动、本地联调与已有项目
 

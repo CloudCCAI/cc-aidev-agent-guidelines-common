@@ -44,12 +44,13 @@ CRM开发凭据与CLI缓存由多个应用共用项目根目录文件，类源�
 
 ### Web 调用自定义类
 
-CRM 宿主页面具备 CCDK 时，通过 CCDK 的 `ccommon` 调用自定义类，方法签名以目标环境提供的 CCDK 为准。跨域 iframe Site 通过公共 SDK 获取上下文，使用 OpenAPI；不默认 Site 已加载 CCDK，不直接访问 `parent.$CCDK`。
+CRM 宿主页面具备 CCDK 时，通过 `window.$CCDK.CCCommon.post(className, methodName, params)` 调用自定义类。参数格式以已安装 CloudCC 专用技能的 `cloudcc doc pagecomponent devguide`「在组件中调用自定义类」为依据。跨域 iframe Site 通过公共 SDK 获取上下文，使用 OpenAPI；不默认 Site 已加载 CCDK，不直接访问 `parent.$CCDK`。
 
 iframe 中的调用顺序：等待 `client.ready`，从每次请求时的 `client.getContext().cloudccContext` 读取最新 `accessToken` 和 `ccex-apitsf`，向该服务的 `/api/openCall/common` 发起 POST：
 
 ```js
 const crm = client.getContext().cloudccContext;
+const abortController = new AbortController();
 const response = await fetch(
   crm['ccex-apitsf'].replace(/\/$/, '') + '/api/openCall/common',
   {
@@ -58,7 +59,9 @@ const response = await fetch(
     body: JSON.stringify({
       className: 'OrderApplication',
       methodName: 'saveOrder',
-      params: [orderInput]
+      params: [
+        { argType: 'java.lang.String', argValue: JSON.stringify(orderInput) }
+      ]
     }),
     signal: abortController.signal
   }
@@ -70,7 +73,25 @@ if (!response.ok || result.result !== true) {
 const order = result.data;
 ```
 
-`OrderApplication`、`saveOrder` 为示例，必须替换成实际已安装的类与方法；`params` 为按方法契约组织的参数数组。Token 对自定义类调用通用，但 AgentCiCi 的 `apiKey` 和开发者 Token 不能替代这里的 CloudCC Token。CloudCC 服务地址使用 `ccex-apitsf`，不要拼到智能体的 `context.apiBase`。
+`OrderApplication`、`saveOrder` 为示例，假设后端方法签名为 `saveOrder(String orderJson)`，接收业务对象序列化后的 JSON 字符串；实际调用必须替换为已安装的类、方法及其真实参数类型。`params` 按 Java 方法的形参顺序组织，每项必须包含 `argType`（Java 类型）和 `argValue`（参数值），不能直接传原始字符串或业务对象数组。字符串使用完整类型名 `java.lang.String`；其他类型须按目标方法与平台文档确认，不能把所有参数统一转成字符串。
+
+多参数示例：假设后端方法为 `createDraft(String title, String keywords, String tone)`，请求参数须按此顺序传入：
+
+```js
+{
+  className: 'ExampleApplication',
+  methodName: 'createDraft',
+  params: [
+    { argType: 'java.lang.String', argValue: '月光下的相遇' },
+    { argType: 'java.lang.String', argValue: '月亮、旧车站、猫' },
+    { argType: 'java.lang.String', argValue: '温暖治愈' }
+  ]
+}
+```
+
+以上 `params` 结构同样适用于 `CCCommon.post` 和下述 `callClass` 辅助方法。Token 对自定义类调用通用，但 AgentCiCi 的 `apiKey` 和开发者 Token 不能替代这里的 CloudCC Token。CloudCC 服务地址使用 `ccex-apitsf`，不要拼到智能体的 `context.apiBase`。
+
+示例中的 `client` 是已初始化的 SDK client，`orderInput` 是调用方准备的业务对象。页面卸载、身份切换或超时处理可调用 `abortController.abort()`；取消浏览器请求不保证服务端停止写入，保存结果未知时仍须先核实，不能据此自动重发。
 
 目标环境已部署 `agentcici-cloudcc@1.0.0.js` 时，可以加载该辅助脚本并用 `AgentCiCiCloudCC.createCaller(client).callClass(className, methodName, params)` 封装上述请求；它依赖已初始化的公共 SDK client。未部署时使用应用自身的小调用模块，不假设辅助脚本已上线。动态加载 JS 仍遵守技能入口的时间戳缓存规则。
 

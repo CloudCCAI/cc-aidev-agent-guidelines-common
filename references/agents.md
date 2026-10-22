@@ -49,16 +49,16 @@
 知识库和工具通过现有 PATCH 接口关联，以下命令仅改变对应字段。三种 bind 命令均替换完整列表，操作前先读取现状保留其他关联。
 
 ```bash
-python3 scripts/agentcici_manage.py agents skills AGENT_ID
-python3 scripts/agentcici_manage.py agents bind-skills AGENT_ID --file /absolute/path/bindings.json
-python3 scripts/agentcici_manage.py agents bind-knowledge AGENT_ID --json '{"knowledgeBaseIds":[123]}'
-python3 scripts/agentcici_manage.py agents bind-tools AGENT_ID --json '{"toolIds":["query_customer"]}'
-python3 scripts/agentcici_manage.py agents compile AGENT_ID
-python3 scripts/agentcici_manage.py agents publish AGENT_ID --version-no 1
-python3 scripts/agentcici_manage.py agents delete AGENT_ID --confirm-id AGENT_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py agents skills AGENT_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py agents bind-skills AGENT_ID --file /absolute/path/bindings.json
+python3 /installed/agentcici/scripts/agentcici_manage.py agents bind-knowledge AGENT_ID --json '{"knowledgeBaseIds":[123]}'
+python3 /installed/agentcici/scripts/agentcici_manage.py agents bind-tools AGENT_ID --json '{"toolIds":["query_customer"]}'
+python3 /installed/agentcici/scripts/agentcici_manage.py agents compile AGENT_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py agents publish AGENT_ID --version-no DRAFT_VERSION_NO
+python3 /installed/agentcici/scripts/agentcici_manage.py agents delete AGENT_ID --confirm-id AGENT_ID
 ```
 
-发布 version-no 必须来自本次编译返回的 draftVersionNo，不固定写 1。编译会保存新草稿版本；先检查编译结果，再发布该版本，后端执行现有发布校验。通用发布不添加 API 渠道；开启运行 OpenAPI 参考运行接口文档。
+示例中的 `DRAFT_VERSION_NO` 必须替换为本次编译返回的 `draftVersionNo` 正整数，不写死版本号。编译会保存新草稿版本；先检查编译结果，再发布该版本，后端执行现有发布校验。通用发布不添加 API 渠道；开启运行 OpenAPI 参考运行接口文档。
 
 生日邮件示例顺序：创建/编辑邮件技能 → 编译并发布技能 → 创建/编辑智能体 → 关联技能、知识库、工具 → 编译智能体 → 发布返回的版本。定义编辑和关联修改只有重新编译发布后才进入新的运行版本。
 
@@ -75,9 +75,9 @@ python3 scripts/agentcici_manage.py agents delete AGENT_ID --confirm-id AGENT_ID
 创建请求 `name` 必填；可选字段为 `expiresAt`（UTC ISO 时间）、`allowedIps`、`rateLimitPerMinute`、`dailyQuota`、`maxPromptChars`、`maxResponseChars`、`allowStream`、`allowTraceRead`、`scopes`、`keyType`、`principalMemberId`。`runAsUserId` 仅为旧字段，当前服务端拒绝新建时传入非空值。普通应用使用 `keyType: "standard"`，不要自行使用 CloudCC 专用身份。`principalMemberId` 如指定，必须是本组织可用的 API_CLIENT 服务成员；省略时由服务端创建受管运行身份。普通调用可选 `scopes: ["chat"]`；省略时由服务端应用默认 scope，不等同于开发者 scope。
 
 ```bash
-python3 scripts/agentcici_manage.py agents get AGENT_ID
-python3 scripts/agentcici_manage.py agents create-api-key AGENT_ID --json '{"name":"短期联调","keyType":"standard","scopes":["chat"],"expiresAt":"2026-10-23T00:00:00Z"}' --output /私密目录/agent-key.json
-python3 scripts/agentcici_manage.py agents revoke-api-key AGENT_ID CREDENTIAL_ID --confirm-id CREDENTIAL_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py agents get AGENT_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py agents create-api-key AGENT_ID --json '{"name":"短期联调","keyType":"standard","scopes":["chat"],"expiresAt":"2026-10-23T00:00:00Z"}' --output /私密目录/agent-key.json
+python3 /installed/agentcici/scripts/agentcici_manage.py agents revoke-api-key AGENT_ID CREDENTIAL_ID --confirm-id CREDENTIAL_ID
 ```
 
 按实际联调时间设置未来过期时间，不照抄示例日期。创建前回读目标智能体，确认组织、ID、用途；需要运行时核对已发布版本和 API 渠道，不擅自发布或修改渠道。撤销前核对目标 credential ID 和所属智能体；用户已授权的测试清理无需再次询问。

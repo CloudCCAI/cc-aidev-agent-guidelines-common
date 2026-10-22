@@ -25,8 +25,8 @@
 
 ```bash
 mkdir -p exports
-python3 scripts/agentcici_manage.py agents export customer-email-assistant --output exports/customer-email-assistant.ciciagent
-python3 scripts/agentcici_manage.py skills export 36 --output exports/birthday-writer.zip
+python3 /installed/agentcici/scripts/agentcici_manage.py agents export customer-email-assistant --output exports/customer-email-assistant.ciciagent
+python3 /installed/agentcici/scripts/agentcici_manage.py skills export 36 --output exports/birthday-writer.zip
 ```
 
 - 智能体：GET `/openapi/v1/management/agents/{agentId}/package`，需要 agent.read 及绑定成员的 MANAGE 权限，复用原生保存草稿快照导出。

@@ -75,15 +75,15 @@ MCP和工具声明在mcpServers/tools，工具依赖用agent.tools中的bindingR
 ## 常用命令
 
 ```bash
-python3 scripts/agentcici_application.py check --manifest /project/application.json
-python3 scripts/agentcici_application.py package --manifest /project/application.json --output /project/release/app-1.0.0.zip
-python3 scripts/agentcici_application.py validate /project/release/app-1.0.0.zip
-python3 scripts/agentcici_application.py submit /project/release/app-1.0.0.zip
-python3 scripts/agentcici_application.py status REQUEST_ID
-python3 scripts/agentcici_application.py list
-python3 scripts/agentcici_application.py get app-code
-python3 scripts/agentcici_application.py publish app-code --version 1.0.0
-python3 scripts/agentcici_application.py release --manifest /project/applications/app-code/application.json --output /project/applications/app-code/release/app-code-1.0.0.zip
+python3 /installed/agentcici/scripts/agentcici_application.py check --manifest /project/applications/app-code/application.json
+python3 /installed/agentcici/scripts/agentcici_application.py package --manifest /project/applications/app-code/application.json --output /project/applications/app-code/release/app-code-1.0.0.zip
+python3 /installed/agentcici/scripts/agentcici_application.py validate /project/applications/app-code/release/app-code-1.0.0.zip
+python3 /installed/agentcici/scripts/agentcici_application.py submit /project/applications/app-code/release/app-code-1.0.0.zip
+python3 /installed/agentcici/scripts/agentcici_application.py status REQUEST_ID
+python3 /installed/agentcici/scripts/agentcici_application.py list
+python3 /installed/agentcici/scripts/agentcici_application.py get app-code
+python3 /installed/agentcici/scripts/agentcici_application.py publish app-code --version 1.0.0
+python3 /installed/agentcici/scripts/agentcici_application.py release --manifest /project/applications/app-code/application.json --output /project/applications/app-code/release/app-code-1.0.0.zip
 ```
 
 ## 删除本组织应用与全部版本包
@@ -91,8 +91,8 @@ python3 scripts/agentcici_application.py release --manifest /project/application
 DELETE `/openapi/v1/management/ai-applications/{appCode}` 需要 `application.delete`，仅能删除本组织拥有的应用，不能删除平台或其他组织应用。对应后端须已部署；已有开发者凭据不会自动获得删除scope，需要按用户授权调整权限。
 
 ```bash
-python3 scripts/agentcici_application.py get APP_CODE
-python3 scripts/agentcici_application.py delete APP_CODE --confirm-id APP_CODE
+python3 /installed/agentcici/scripts/agentcici_application.py get APP_CODE
+python3 /installed/agentcici/scripts/agentcici_application.py delete APP_CODE --confirm-id APP_CODE
 ```
 
 先get核对名称、代码及版本，取得用户对该精确应用的明确删除授权；`--confirm-id` 必须与目标appCode相同，不能凭占位符执行。此命令删除整个应用及全部版本包、资源文件和发布站点，成功返回appCode与deleted=true，不是只删除最新版本。不可恢复，需要保留时先下载原包。存在安装记录或市场引用时服务端拒绝；不自动卸载CRM资源、撤回市场申请或删除客户业务数据，不删除组织独立智能体/技能/知识库。失败展示原错误，不自动重试；响应丢失时先查询核实，不把超时当作删除成功。应用代码及已使用版本不会因删除变成可重用。

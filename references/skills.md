@@ -49,9 +49,9 @@
 - CLI `skills update` 自动 GET 并合并可写字段，所以还需要 `skill.read`；未提供字段保留，列表提供 `[]` 则清空。
 
 ```bash
-python3 scripts/agentcici_manage.py skills compile SKILL_ID
-python3 scripts/agentcici_manage.py skills publish SKILL_ID --change-log '生日邮件技能初版'
-python3 scripts/agentcici_manage.py skills delete SKILL_ID --confirm-id SKILL_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py skills compile SKILL_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py skills publish SKILL_ID --change-log '生日邮件技能初版'
+python3 /installed/agentcici/scripts/agentcici_manage.py skills delete SKILL_ID --confirm-id SKILL_ID
 ```
 
 检查编译警告后再发布，确认返回 `currentPublishedVersionId`。技能更新不会自动改变智能体已固定的发布快照；需要重新编译发布关联智能体。

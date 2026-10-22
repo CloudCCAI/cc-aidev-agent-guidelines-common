@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.7.0"
+  version: "1.7.3"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能、知识库和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.7.0`。
+当前技能版本：`1.7.3`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -75,7 +75,7 @@ cloudcc doc fields devguide
 - 资源设计：构建 AI 应用时，默认优先新建归属当前应用的自定义对象（及所需字段）和自定义类；只有用户明确要求扩展已有资源时，才在其指定范围内新增字段、修改对象定义或扩展类逻辑。查询已有资源用于了解现状、检查 API Name 冲突和必要关联，不能据此擅自改为扩展已有资源；继续开发时保留本应用已创建的资源，不重复新建。
 - 数据存储：创建 CloudCC 自定义对象和字段，保存业务数据；按上述资源设计规则核对已有对象与字段。 存储长文本内容时可选文本区字段（4000 字符）或文本区长字段（32000 字符），按预期长度选型，详见 [长文本字段选型](references/web-app-development.md#长文本字段选型)。对象、字段的业务引用使用 API Name，不在代码或可分发包中写死源 org 的内部 ID。
 - 业务逻辑：使用 CloudCC 自定义类实现查询、写入、校验和业务规则。Web 负责展示、交互及必要的输入提示，最终校验和访问权限在自定义类中按当前用户与 org 执行；不信任前端传入的组织或用户身份。
-- 调用方式：CRM 宿主中的 Web 可通过 CCDK 的 `ccommon` 调用自定义类；iframe Site 使用宿主 SDK 提供的 `cloudccContext`，通过 OpenAPI 调用同一自定义类。不要直接读取跨域 parent 的 CCDK，也不要把业务数据读写改为浏览器直接访问对象接口。
+- 调用方式：CRM 宿主中的 Web 通过 `window.$CCDK.CCCommon.post(className, methodName, params)` 调用自定义类；iframe Site 使用宿主 SDK 提供的 `cloudccContext`，通过 OpenAPI 调用同一自定义类。两者的 `params` 均按 Java 形参顺序传入 `{argType, argValue}` 对象。不要直接读取跨域 parent 的 CCDK，也不要把业务数据读写改为浏览器直接访问对象接口。
 - 交付内容：除 Web 构建产物外，需要时提供对象、字段定义与自定义类源码，纳入 AI 应用包的业务资源。客户安装不依赖 MetadataService；直接开发CRM资源时遵守专用技能的provider规则，不复用传统软件包安装代码；具体打包与安装以目标环境已部署能力为准。
 
 按需读取 [Web 应用开发中的数据与业务逻辑](references/web-app-development.md#cloudcc-数据存储与业务逻辑) 和 [业务资源交付](references/ai-applications.md#cloudcc-业务资源交付)。没有存储或业务规则的应用不强制增加对象或类。
@@ -161,23 +161,25 @@ script.src = url.href;
 
 ## 命令入口
 
+命令示例中的 `/installed/agentcici` 代表本技能的实际绝对安装路径，执行前替换；在用户项目目录运行，避免相对脚本路径或切换到技能目录导致配置解析到错误项目。
+
 ```bash
-python3 scripts/agentcici_manage.py agents list
-python3 scripts/agentcici_manage.py agents get AGENT_ID
-python3 scripts/agentcici_manage.py agents create --file /absolute/path/agent.json
-python3 scripts/agentcici_manage.py agents update AGENT_ID --json '{"summary":"新的说明"}'
+python3 /installed/agentcici/scripts/agentcici_manage.py agents list
+python3 /installed/agentcici/scripts/agentcici_manage.py agents get AGENT_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py agents create --file /absolute/path/agent.json
+python3 /installed/agentcici/scripts/agentcici_manage.py agents update AGENT_ID --json '{"summary":"新的说明"}'
 
-python3 scripts/agentcici_manage.py skills list
-python3 scripts/agentcici_manage.py skills create --file /absolute/path/skill.json
-python3 scripts/agentcici_manage.py skills update SKILL_ID --file /absolute/path/skill.json
+python3 /installed/agentcici/scripts/agentcici_manage.py skills list
+python3 /installed/agentcici/scripts/agentcici_manage.py skills create --file /absolute/path/skill.json
+python3 /installed/agentcici/scripts/agentcici_manage.py skills update SKILL_ID --file /absolute/path/skill.json
 
-python3 scripts/agentcici_manage.py mcp list
-python3 scripts/agentcici_manage.py mcp create --file /absolute/path/mcp.json
-python3 scripts/agentcici_manage.py mcp update SERVER_ID --file /absolute/path/mcp.json
-python3 scripts/agentcici_manage.py mcp discover SERVER_ID
-python3 scripts/agentcici_manage.py mcp tools SERVER_ID
-python3 scripts/agentcici_manage.py tools list
-python3 scripts/agentcici_manage.py agents bind-tools AGENT_ID --file /absolute/path/binding.json
+python3 /installed/agentcici/scripts/agentcici_manage.py mcp list
+python3 /installed/agentcici/scripts/agentcici_manage.py mcp create --file /absolute/path/mcp.json
+python3 /installed/agentcici/scripts/agentcici_manage.py mcp update SERVER_ID --file /absolute/path/mcp.json
+python3 /installed/agentcici/scripts/agentcici_manage.py mcp discover SERVER_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py mcp tools SERVER_ID
+python3 /installed/agentcici/scripts/agentcici_manage.py tools list
+python3 /installed/agentcici/scripts/agentcici_manage.py agents bind-tools AGENT_ID --file /absolute/path/binding.json
 ```
 
 长数据优先使用 `--file`，减少 shell 转义和敏感内容进入终端历史的风险。

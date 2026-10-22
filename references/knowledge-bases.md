@@ -21,18 +21,18 @@
 
 ## 命令流程
 
-在用户项目目录调用已安装技能脚本绝对路径，以下用脚本文件名简写：
+在用户项目目录调用已安装技能脚本绝对路径；将下方 `/installed/agentcici` 替换为实际技能安装目录：
 
 ```bash
-python3 agentcici_manage.py knowledge list
-python3 agentcici_manage.py knowledge create --json '{"name":"应用产品资料","description":"已获授权的知识资料"}'
-python3 agentcici_manage.py knowledge get 123
-python3 agentcici_manage.py knowledge update 123 --json '{"description":"新的说明"}'
-python3 agentcici_manage.py knowledge upload 123 --file /project/approved/product-guide.pdf
-python3 agentcici_manage.py knowledge publish-document 456
-python3 agentcici_manage.py knowledge documents 123
-python3 agentcici_manage.py knowledge retrieve 123 --json '{"query":"目标产品的适用范围是什么？"}'
-python3 agentcici_manage.py agents bind-knowledge app-agent --json '{"knowledgeBaseIds":[123]}'
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge list
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge create --json '{"name":"应用产品资料","description":"已获授权的知识资料"}'
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge get 123
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge update 123 --json '{"description":"新的说明"}'
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge upload 123 --file /project/approved/product-guide.pdf
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge publish-document 456
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge documents 123
+python3 /installed/agentcici/scripts/agentcici_manage.py knowledge retrieve 123 --json '{"query":"目标产品的适用范围是什么？"}'
+python3 /installed/agentcici/scripts/agentcici_manage.py agents bind-knowledge app-agent --json '{"knowledgeBaseIds":[123]}'
 ```
 
 123/456为示例，使用本次返回的真实ID。先读取智能体并保留已有知识库关联，不能直接套用示例覆盖。资料上传后检查文档状态与indexedAt；INDEXING不是完成，FAILED要读取错误；索引完成后必须以实际问题验证命中内容，再绑定或编译发布智能体。接口复用现有文件类型/大小、商业额度及索引限制，不无限轮询。上传结果未知先查询文档列表，CLI不会自动重复上传。
