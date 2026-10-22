@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import io
 import mimetypes
+import os
 import re
 import zipfile
 import uuid
@@ -151,6 +152,14 @@ def add_resource_commands(module: argparse.ArgumentParser, id_name: str) -> None
         else:
             publish.add_argument("--change-log", default="")
     if module.prog.endswith("agents"):
+        create_key = commands.add_parser("create-api-key", help="创建运行密钥，仅写入指定的私密 JSON 文件")
+        create_key.add_argument(id_name)
+        add_payload_arguments(create_key)
+        create_key.add_argument("--output", required=True)
+        revoke_key = commands.add_parser("revoke-api-key", help="撤销指定运行密钥")
+        revoke_key.add_argument(id_name)
+        revoke_key.add_argument("credential_id", type=int)
+        revoke_key.add_argument("--confirm-id", required=True)
         bindings = commands.add_parser("skills", help="读取技能关联")
         bindings.add_argument(id_name)
         for name in ("bind-skills", "bind-knowledge", "bind-tools"):
@@ -207,6 +216,26 @@ def execute(client, args):
         return client.request("GET", "/openapi/v1/management/tools")
     base = resource_path(args.module)
     path = base + "/" + urllib.parse.quote(getattr(args, "resource_id", ""), safe="")
+    if args.module == "agents" and args.command == "create-api-key":
+        body = read_payload(args)
+        output = pathlib.Path(args.output).expanduser().resolve()
+        # Reserve a private destination before creating a remote credential.
+        try:
+            descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            raise RuntimeError("输出文件已存在，请选择新路径") from None
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+                result = client.request("POST", path + "/api-keys", body)
+                json.dump(result, file, ensure_ascii=False, indent=2)
+        except Exception:
+            # A timeout may leave a remote key; never automatically retry creation.
+            raise RuntimeError("密钥创建或保存失败，结果可能未知；请核对后台密钥列表，不自动重试。输出路径：" + str(output)) from None
+        return {"file": str(output), "credentialId": result["credential"]["id"]}
+    if args.module == "agents" and args.command == "revoke-api-key":
+        if args.credential_id <= 0 or str(args.credential_id) != args.confirm_id:
+            raise RuntimeError("--confirm-id 必须与待撤销的正整数 credential ID 完全一致")
+        return client.request("POST", path + "/api-keys/" + str(args.credential_id) + "/revoke", {})
     if args.command == "list":
         return client.request("GET", base)
     if args.command == "get":

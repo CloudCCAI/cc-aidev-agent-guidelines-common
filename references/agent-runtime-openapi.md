@@ -4,7 +4,7 @@
 
 运行 OpenAPI 用于让外部应用与一个已发布智能体对话、维护会话和上传文件。它使用该智能体自己的 Agent API Key：`Authorization: Bearer <AGENTCICI_API_KEY>`。开发者管理 Token 不能调用运行 API，Agent API Key 也不能管理平台资产。
 
-Agent API Key 由组织管理员在智能体详情的“开放 API 文档/密钥管理”中创建、限制来源并管理生命周期。
+Agent API Key 可由有权限的开发者通过[管理命令](agents.md#运行-api-key-管理)创建和撤销，也可由组织管理员在智能体详情的“开放 API 文档/密钥管理”中创建、限制来源并管理生命周期。
 
 ## apiBase 与请求路径
 

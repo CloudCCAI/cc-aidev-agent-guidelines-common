@@ -87,3 +87,41 @@ class ManagementTests(unittest.TestCase):
             client.download.return_value = b'zip'
             self.run_command('skills', 'export', '36', '--allow-draft', '--output', str(Path(directory) / 'skill.zip'), client=client)
             client.download.assert_called_once_with('POST', '/openapi/v1/management/skills/36/package', {'allowDraft': True})
+
+    def test_create_key_private_file_and_redacted_result(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'key.json'
+            client = Mock()
+            payload = {'credential': {'id': 17}, 'plainKey': 'test-secret'}
+            client.request.return_value = payload
+            result = execute(client, parser().parse_args(['agents', 'create-api-key', 'a/b', '--json', '{"name":"test"}', '--output', str(output)]))
+            client.request.assert_called_once_with('POST', '/openapi/v1/management/agents/a%2Fb/api-keys', {'name': 'test'})
+            self.assertEqual(json.loads(output.read_text()), payload)
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(result, {'file': str(output.resolve()), 'credentialId': 17})
+            with self.assertRaises(RuntimeError):
+                self.run_command('agents', 'create-api-key', 'a', '--json', '{"name":"test"}', '--output', str(output), client=client)
+            self.assertEqual(client.request.call_count, 1)
+
+    def test_create_key_unknown_result_not_retried_or_leaked(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            client = Mock()
+            client.request.side_effect = RuntimeError('sensitive-server-content')
+            with self.assertRaisesRegex(RuntimeError, '结果可能未知') as error:
+                self.run_command('agents', 'create-api-key', 'a', '--json', '{"name":"test"}', '--output', str(Path(directory) / 'key.json'), client=client)
+            self.assertNotIn('sensitive-server-content', str(error.exception))
+            self.assertEqual(client.request.call_count, 1)
+
+    def test_revoke_key_requires_exact_credential_confirmation(self):
+        client = self.run_command('agents', 'revoke-api-key', 'a', '17', '--confirm-id', '17')
+        client.request.assert_called_once_with('POST', '/openapi/v1/management/agents/a/api-keys/17/revoke', {})
+        for credential_id, confirmation in [('17', '18'), ('0', '0'), ('-1', '-1')]:
+            client = Mock()
+            with self.assertRaises(RuntimeError):
+                self.run_command('agents', 'revoke-api-key', 'a', credential_id, '--confirm-id', confirmation, client=client)
+            client.request.assert_not_called()

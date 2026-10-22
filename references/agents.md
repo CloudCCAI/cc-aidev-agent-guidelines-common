@@ -61,3 +61,31 @@ python3 scripts/agentcici_manage.py agents delete AGENT_ID --confirm-id AGENT_ID
 发布 version-no 必须来自本次编译返回的 draftVersionNo，不固定写 1。编译会保存新草稿版本；先检查编译结果，再发布该版本，后端执行现有发布校验。通用发布不添加 API 渠道；开启运行 OpenAPI 参考运行接口文档。
 
 生日邮件示例顺序：创建/编辑邮件技能 → 编译并发布技能 → 创建/编辑智能体 → 关联技能、知识库、工具 → 编译智能体 → 发布返回的版本。定义编辑和关联修改只有重新编译发布后才进入新的运行版本。
+
+
+## 运行 API Key 管理
+
+开发者 Token 可以创建、撤销 Agent API Key，不能代替生成的 Key 调用运行 API。两个接口都需要 `agent.write`；创建还检查凭据绑定成员的智能体 `OPENAPI` 权限。撤销本人创建的 Key 允许在智能体停用后进行，撤销其他人的 Key 仍检查 `OPENAPI` 权限。服务端未部署时不能改用后台登录接口绕过。
+
+| 操作 | 方法与路径 |
+|---|---|
+| 创建 | `POST /openapi/v1/management/agents/{agentId}/api-keys` |
+| 撤销 | `POST /openapi/v1/management/agents/{agentId}/api-keys/{credentialId}/revoke` |
+
+创建请求 `name` 必填；可选字段为 `expiresAt`（UTC ISO 时间）、`allowedIps`、`rateLimitPerMinute`、`dailyQuota`、`maxPromptChars`、`maxResponseChars`、`allowStream`、`allowTraceRead`、`scopes`、`keyType`、`principalMemberId`。`runAsUserId` 仅为旧字段，当前服务端拒绝新建时传入非空值。普通应用使用 `keyType: "standard"`，不要自行使用 CloudCC 专用身份。`principalMemberId` 如指定，必须是本组织可用的 API_CLIENT 服务成员；省略时由服务端创建受管运行身份。普通调用可选 `scopes: ["chat"]`；省略时由服务端应用默认 scope，不等同于开发者 scope。
+
+```bash
+python3 scripts/agentcici_manage.py agents get AGENT_ID
+python3 scripts/agentcici_manage.py agents create-api-key AGENT_ID --json '{"name":"短期联调","keyType":"standard","scopes":["chat"],"expiresAt":"2026-10-23T00:00:00Z"}' --output /私密目录/agent-key.json
+python3 scripts/agentcici_manage.py agents revoke-api-key AGENT_ID CREDENTIAL_ID --confirm-id CREDENTIAL_ID
+```
+
+按实际联调时间设置未来过期时间，不照抄示例日期。创建前回读目标智能体，确认组织、ID、用途；需要运行时核对已发布版本和 API 渠道，不擅自发布或修改渠道。撤销前核对目标 credential ID 和所属智能体；用户已授权的测试清理无需再次询问。
+
+创建响应包含 `credential` 和只返回一次的 `plainKey`。CLI 必须指定 `--output`，以独占创建、POSIX `0600` 权限保存完整响应，已有文件不覆盖；终端只输出文件路径和 `credentialId`。输出必须位于仓库/发布目录外的私密目录或已明确忽略且不参与打包的位置，不把 Key 放入命令参数、日志、回答或发布包。自动联调也可通过 Python `Client` 在进程内接收结果并于 finally 撤销，不需要落盘。临时 Key 验证后撤销，删除本机明文文件不等于撤销远端 Key。
+
+创建发生超时或保存失败时，结果可能未知，停止且通过后台核对，不能自动重试以免重复生成 Key；输出文件可能为空或不完整。404 可能为接口未部署或资源不可见，先用 `agents get` 区分；401/403 是登录或权限问题，不能据此断言接口不存在。当前管理接口没有列出 Key 的命令，不杜撰列表接口。
+
+### 1.7.0 验证记录（2026-10-22）
+
+本地 `python3 -m unittest discover -s scripts -p 'test_*.py'`：87 项通过，覆盖私密文件权限、不覆盖、摘要脱敏、创建异常不重试、撤销 ID 确认。UAT `https://uat.agentcici.com` 使用已发布 `smart-form-input-app-agent` 实际创建临时 Key（credential ID 85）：私密输出文件权限 0600，`GET /openapi/v1/parameters` 返回 200；撤销返回 `revoked: true`，同 Key 再请求返回 401。临时明文文件已清理，未发起模型生成。此结果仅证明该环境与当前凭据的权限可用，不代表其他环境已部署。

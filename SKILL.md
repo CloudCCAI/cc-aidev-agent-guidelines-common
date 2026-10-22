@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.6.9"
+  version: "1.7.0"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能、知识库和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.6.9`。
+当前技能版本：`1.7.0`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -129,6 +129,7 @@ script.src = url.href;
 - AI 应用开发或发布申请包：先读 [references/ai-applications.md](references/ai-applications.md)，开发前端时再读 [references/web-app-development.md](references/web-app-development.md)。使用 `scripts/agentcici_application.py check|package|validate|submit|draft|status|list|get|publish|release|delete`；本地打包成功不代表已提交、已发布或可自动安装。删除应用使用 `delete APP_CODE --confirm-id APP_CODE`，先查询并取得用户对精确目标的明确授权；删除范围与引用限制见该参考文档。
 - 智能体/技能上传下载及知识库依赖：读 [references/resource-packages.md](references/resource-packages.md)。保留原生包，不用 CRUD 返回 JSON 冒充导出包；后台登录接口不能使用开发者 Token 冒充登录身份。
 - 智能体设计、CRUD、关联资源或编译发布：先读 [references/agents.md](references/agents.md)，实施时运行 `scripts/agentcici_manage.py agents ...`。
+- 创建或撤销智能体运行密钥：先读 [智能体密钥管理](references/agents.md#运行-api-key-管理)，使用 `agents create-api-key` / `agents revoke-api-key`；明文 Key 只保存到指定私密文件，不回显或打包。
 - 调用已发布智能体：读 [references/agent-runtime-openapi.md](references/agent-runtime-openapi.md)。这套运行 API 使用 Agent API Key，不使用开发者密钥。
 - 技能设计、CRUD 或编译发布：先读 [references/skills.md](references/skills.md)，实施时运行 `scripts/agentcici_manage.py skills ...`。
 - MCP 服务设计、CRUD、工具发现与组织现有工具读取：先读 [references/mcp-tools.md](references/mcp-tools.md)，实施时运行 `scripts/agentcici_manage.py mcp ...` 或 `tools list`；工具只能读取并关联智能体，不单独创建。
