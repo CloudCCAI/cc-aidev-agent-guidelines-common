@@ -304,6 +304,9 @@ def main():
     publish = commands.add_parser('publish', help='发布已上传的本组织版本')
     publish.add_argument('app_code')
     publish.add_argument('--version', required=True)
+    deletion = commands.add_parser('delete', help='删除本组织应用及全部版本包，有安装或市场引用时拒绝')
+    deletion.add_argument('app_code')
+    deletion.add_argument('--confirm-id', required=True)
     preflight = commands.add_parser('check', help='列出源清单缺失必填项，供发布前问答')
     preflight.add_argument('--manifest', required=True)
     submit = commands.add_parser('submit', help='提交待审核申请，不直接发布')
@@ -316,13 +319,16 @@ def main():
     check.add_argument('file')
     args = parser.parse_args()
     try:
-        if args.command in ('list', 'get', 'publish'):
+        if args.command in ('list', 'get', 'publish', 'delete'):
             if args.command == 'list':
                 result = Client().request('GET', '/openapi/v1/management/ai-applications/owned')
             else:
                 require(re.fullmatch(r'[a-z][a-z0-9-]{1,63}', args.app_code), '应用代码非法')
                 path = '/openapi/v1/management/ai-applications/' + args.app_code
-                if args.command == 'get':
+                if args.command == 'delete':
+                    require(args.confirm_id == args.app_code, '--confirm-id必须与应用代码相同')
+                    result = Client().request('DELETE', path)
+                elif args.command == 'get':
                     result = Client().request('GET', path)
                 else:
                     require(re.fullmatch(r'[0-9]\.[0-9]\.[0-9]', args.version), '版本非法')

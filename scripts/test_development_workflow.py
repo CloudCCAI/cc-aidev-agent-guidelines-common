@@ -142,6 +142,25 @@ class BusinessPackageTest(unittest.TestCase):
             self.assertEqual(app.main(), 0)
             factory.return_value.request.assert_called_once_with('POST', '/openapi/v1/management/ai-applications/record-app/versions/1.0.0/publish', {})
 
+    def test_delete_requires_matching_application_confirmation(self):
+        for confirm, expected in [('other-app', 1), ('record-app', 0)]:
+            with patch.object(app, 'Client') as factory, patch('sys.argv', ['app', 'delete', 'record-app', '--confirm-id', confirm]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                factory.return_value.request.return_value = {'appCode': 'record-app', 'deleted': True}
+                self.assertEqual(app.main(), expected)
+                if expected:
+                    factory.assert_not_called()
+                else:
+                    factory.return_value.request.assert_called_once_with('DELETE', '/openapi/v1/management/ai-applications/record-app')
+
+    def test_delete_requires_confirmation_argument_and_does_not_retry_conflict(self):
+        with patch.object(app, 'Client') as factory, patch('sys.argv', ['app', 'delete', 'record-app']), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit): app.main()
+            factory.assert_not_called()
+        with patch.object(app, 'Client') as factory, patch('sys.argv', ['app', 'delete', 'record-app', '--confirm-id', 'record-app']), contextlib.redirect_stderr(io.StringIO()):
+            factory.return_value.request.side_effect = RuntimeError('版本被市场或安装引用，不能删除')
+            self.assertEqual(app.main(), 1)
+            factory.return_value.request.assert_called_once()
+
     def test_release_builds_uploads_drafts_and_publishes_in_order(self):
         (self.root / 'application.json').write_text(json.dumps(self.config))
         request_id = '11111111-1111-4111-8111-111111111111'

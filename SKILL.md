@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.6.5"
+  version: "1.6.7"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能、知识库和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.6.5`。
+当前技能版本：`1.6.7`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -68,7 +68,8 @@ cloudcc doc fields devguide
 - **Web → Agent（智能体）**：通过宿主 SDK 获取运行上下文，调用已发布智能体的运行 OpenAPI；按 [运行接口规范](references/agent-runtime-openapi.md) 处理鉴权、会话与流式响应。
 
 - 脚本兼容：应用 `package.json` 不设置 `"type": "module"`，页面不使用 `<script type="module">`；发布产物使用普通 `.js` 脚本，不交付需要浏览器加载的 `.mjs` 或原生 ES Module。源码模块需经构建合并为 IIFE/普通脚本，具体要求见 [构建与站点](references/web-app-development.md#构建与站点)。
-- 数据存储：创建 CloudCC 自定义对象和字段，保存业务数据；先核对已有对象与字段，避免重复创建。对象、字段的业务引用使用 API Name，不在代码或可分发包中写死源 org 的内部 ID。
+- 资源设计：构建 AI 应用时，默认优先新建归属当前应用的自定义对象（及所需字段）和自定义类；只有用户明确要求扩展已有资源时，才在其指定范围内新增字段、修改对象定义或扩展类逻辑。查询已有资源用于了解现状、检查 API Name 冲突和必要关联，不能据此擅自改为扩展已有资源；继续开发时保留本应用已创建的资源，不重复新建。
+- 数据存储：创建 CloudCC 自定义对象和字段，保存业务数据；按上述资源设计规则核对已有对象与字段。对象、字段的业务引用使用 API Name，不在代码或可分发包中写死源 org 的内部 ID。
 - 业务逻辑：使用 CloudCC 自定义类实现查询、写入、校验和业务规则。Web 负责展示、交互及必要的输入提示，最终校验和访问权限在自定义类中按当前用户与 org 执行；不信任前端传入的组织或用户身份。
 - 调用方式：CRM 宿主中的 Web 可通过 CCDK 的 `ccommon` 调用自定义类；iframe Site 使用宿主 SDK 提供的 `cloudccContext`，通过 OpenAPI 调用同一自定义类。不要直接读取跨域 parent 的 CCDK，也不要把业务数据读写改为浏览器直接访问对象接口。
 - 交付内容：除 Web 构建产物外，需要时提供对象、字段定义与自定义类源码，纳入 AI 应用包的业务资源。客户安装不依赖 MetadataService；直接开发CRM资源时遵守专用技能的provider规则，不复用传统软件包安装代码；具体打包与安装以目标环境已部署能力为准。
@@ -121,7 +122,7 @@ script.src = url.href;
 
 ## 选择模块
 
-- AI 应用开发或发布申请包：先读 [references/ai-applications.md](references/ai-applications.md)，开发前端时再读 [references/web-app-development.md](references/web-app-development.md)。使用 `scripts/agentcici_application.py check|package|validate|submit|draft|status|list|get|publish|release`；本地打包成功不代表已提交、已发布或可自动安装。
+- AI 应用开发或发布申请包：先读 [references/ai-applications.md](references/ai-applications.md)，开发前端时再读 [references/web-app-development.md](references/web-app-development.md)。使用 `scripts/agentcici_application.py check|package|validate|submit|draft|status|list|get|publish|release|delete`；本地打包成功不代表已提交、已发布或可自动安装。删除应用使用 `delete APP_CODE --confirm-id APP_CODE`，先查询并取得用户对精确目标的明确授权；删除范围与引用限制见该参考文档。
 - 智能体/技能上传下载及知识库依赖：读 [references/resource-packages.md](references/resource-packages.md)。保留原生包，不用 CRUD 返回 JSON 冒充导出包；后台登录接口不能使用开发者 Token 冒充登录身份。
 - 智能体设计、CRUD、关联资源或编译发布：先读 [references/agents.md](references/agents.md)，实施时运行 `scripts/agentcici_manage.py agents ...`。
 - 调用已发布智能体：读 [references/agent-runtime-openapi.md](references/agent-runtime-openapi.md)。这套运行 API 使用 Agent API Key，不使用开发者密钥。
