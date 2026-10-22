@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.6.3"
+  version: "1.6.4"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能、知识库和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.6.3`。
+当前技能版本：`1.6.4`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -64,6 +64,7 @@ cloudcc doc fields devguide
 
 第三方开发者仍以 React、Vue 或原生 Web 开发应用，交付可部署的静态前端。需要数据存储或业务逻辑时，后端能力由 CloudCC 提供，调用顺序为：**Web → 请求自定义类 → 读写自定义对象**。
 
+- 脚本兼容：应用 `package.json` 不设置 `"type": "module"`，页面不使用 `<script type="module">`；发布产物使用普通 `.js` 脚本，不交付需要浏览器加载的 `.mjs` 或原生 ES Module。源码模块需经构建合并为 IIFE/普通脚本，具体要求见 [构建与站点](references/web-app-development.md#构建与站点)。
 - 数据存储：创建 CloudCC 自定义对象和字段，保存业务数据；先核对已有对象与字段，避免重复创建。对象、字段的业务引用使用 API Name，不在代码或可分发包中写死源 org 的内部 ID。
 - 业务逻辑：使用 CloudCC 自定义类实现查询、写入、校验和业务规则。Web 负责展示、交互及必要的输入提示，最终校验和访问权限在自定义类中按当前用户与 org 执行；不信任前端传入的组织或用户身份。
 - 调用方式：CRM 宿主中的 Web 可通过 CCDK 的 `ccommon` 调用自定义类；iframe Site 使用宿主 SDK 提供的 `cloudccContext`，通过 OpenAPI 调用同一自定义类。不要直接读取跨域 parent 的 CCDK，也不要把业务数据读写改为浏览器直接访问对象接口。

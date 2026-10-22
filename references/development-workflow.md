@@ -45,7 +45,7 @@ CRM调试身份使用项目根目录由CLI生成的.cloudcc-cache.json内对应�
 
 ## 6. 打包、上传与组织发布
 
-- 构建Web，仅收集运行文件；CRM对象/字段交付定义与类SOURCE内容使用平台v2业务资源契约，不能把CLI的plan或完整类目录直接当作安装定义。
+- 按 [脚本格式兼容要求](web-app-development.md#脚本格式兼容要求) 构建 Web 并检查产物：不设置 `"type": "module"`，不使用模块 script、浏览器 `.mjs` 或原生模块加载，输出普通 `.js` 脚本；仅收集运行文件；CRM对象/字段交付定义与类SOURCE内容使用平台v2业务资源契约，不能把CLI的plan或完整类目录直接当作安装定义。
 - 自定义智能体和技能通过开发者接口导出完整原生包；知识库使用逻辑ref/name声明并建立绑定映射；MCP仅携带无凭据服务声明、工具名和逻辑映射，不携带开发headers、Secret、测试Token或开发组织ID。当前包不自动迁移知识文档/索引；目标组织需要按确认的资料交付范围上传、发布索引并验收。
 - 按application.json的cloudccResources声明打包object/field/class，工具验证文件范围、白名单属性、依赖与摘要，保留原生包字节。示例见 [业务资源交付](ai-applications.md#cloudcc-业务资源交付)。
 - check→构建→package→validate→submit→publish；release命令可串联打包、上传、创建草稿和组织发布。使用现有的权限检查；成功结果以服务端返回为准。已上传的原包可以复用submit，不覆盖同版本产物。

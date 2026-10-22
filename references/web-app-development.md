@@ -6,6 +6,15 @@
 
 React、Vue 或原生前端均可，交付静态构建目录，根层必须有 index.html。不要交付 node_modules、开发服务器、SSR 服务或源码目录。资源地址相对站点目录；多页面应用应明确入口，SPA 默认使用 hash 路由，除非实际站点已验证 history fallback。在非根子路径验证 JS/CSS、图片、字体、动态加载和页面刷新，不能只测试开发服务器。
 
+### 脚本格式兼容要求
+
+- 应用 `package.json` 不设置 `"type": "module"`；Node 构建脚本使用 CommonJS，按需使用 `.cjs` 扩展名。
+- 页面使用普通 `<script src="./app.js" defer></script>`，不使用 `<script type="module">`，动态创建的 script 也不得设置 `type = "module"`。
+- 发布的浏览器脚本使用 `.js`，不发布需要浏览器请求的 `.mjs` 文件。React/Vue 或原生源码可使用 import/export，但须在构建阶段合并为 IIFE/普通脚本；最终产物不依赖浏览器原生 import/export、动态 import()、顶层 await 或 modulepreload。异步初始化放入 async 函数中执行。
+- 发布前检查实际构建目录的 HTML 与 JS，而非仅检查源码或开发服务器。部署后核对脚本响应为 JavaScript MIME 类型，并在 CRM 实际容器中验证 SDK 握手和业务启动；HTTP 200 不代表脚本可执行。已发布版本不可直接覆盖，兼容修复使用新版本。
+
+现有 UAT 静态资源服务对 `.mjs` 返回 `application/octet-stream`，浏览器会拒绝将其作为模块执行，从而导致应用初始化超时。上述规则是 AI App 的交付约束，不要求修改平台自身或其他独立项目的模块方案。
+
 框架版本和构建参数以项目锁文件及已安装工具为准。不要引入一个未经提供或发布的 AgentCiCi SDK 包。调用层使用应用自有小模块封装，接真实平台能力前可以用明确标注的 mock；mock 成功不能写成智能体联调成功。
 
 构建包只包含运行必需文件，排除 .env、源码映射、凭据、真实客户数据。VITE_* 等构建变量会进入浏览器，不是密钥存储。打包工具仅做文件名与结构检查，不能证明编译后代码没有敏感内容。
@@ -106,21 +115,24 @@ CloudCC 菜单、按钮和浮动入口统一加载 `frontend/public/sdk/agentcic
 普通 iframe 应用在 `index.html` 中先引入已部署的 `agentcici-app@1.1.0.js`，再启动业务代码。业务代码只创建一个 client：
 
 ```js
-const client = window.AgentCiCiApp.createClient({
-  localContext: window.__AGENTCICI_LOCAL_CONTEXT__
-});
+(async function bootstrap() {
+  const client = window.AgentCiCiApp.createClient({
+    localContext: window.__AGENTCICI_LOCAL_CONTEXT__
+  });
 
-const context = await client.ready;
-// context 也同步保存在 window.AgentCiCiContext。
-startApplication(context);
+  const context = await client.ready;
+  // context 也同步保存在 window.AgentCiCiContext。
+  startApplication(context);
 
-const unsubscribe = client.subscribe(nextContext => {
-  updatePageContext(nextContext.pageContext);
-});
+  const unsubscribe = client.subscribe(nextContext => {
+    updatePageContext(nextContext.pageContext);
+  });
 
-// 页面卸载时：
-unsubscribe();
-client.destroy();
+  window.addEventListener('pagehide', () => {
+    unsubscribe();
+    client.destroy();
+  }, { once: true });
+})().catch(showInitializationError);
 ```
 
 - 发布嵌入模式：SDK 从宿主添加的 `agentciciParentOrigin` 读取当前宿主 Origin，仅向该精确 Origin 发起握手，并且只接受 `event.source === window.parent` 且 `event.origin` 精确相同的回复。不得使用 `*`。
