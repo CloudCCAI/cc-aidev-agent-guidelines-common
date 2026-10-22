@@ -1,13 +1,13 @@
 ---
 name: cc-aidev-agent-guidelines-common
 metadata:
-  version: "1.6.4"
+  version: "1.6.5"
 description: 使用开发者密钥管理 AgentCiCi 组织内智能体、技能、知识库和 MCP 服务，发现并读取 MCP 工具后关联智能体；指导第三方 Web AI 应用开发、CloudCC 自定义对象与自定义类开发、站点与脚本菜单集成，并将前端产物、原生智能体包和技能包整理为发布申请 ZIP 并提交到已部署的接收接口。用于平台资源管理、应用开发与申请包准备；自动安装须先核对服务端能力。
 ---
 
 # AgentCiCi 平台管理
 
-当前技能版本：`1.6.4`。
+当前技能版本：`1.6.5`。
 
 本 Skill 同时服务两个阶段：设计阶段先理解模块职责与边界，实施阶段再调用明确的管理 API。不要在不了解现有资源的情况下直接写入。
 
@@ -62,7 +62,10 @@ cloudcc doc fields devguide
 
 ## 第三方 Web 应用开发规范
 
-第三方开发者仍以 React、Vue 或原生 Web 开发应用，交付可部署的静态前端。需要数据存储或业务逻辑时，后端能力由 CloudCC 提供，调用顺序为：**Web → 请求自定义类 → 读写自定义对象**。
+应用使用原生 Web（HTML、CSS、JavaScript）开发，交付可部署的静态前端。业务按需采用两条调用链，可在同一应用中组合：
+
+- **Web → 自定义类 → 自定义对象**：由 CloudCC 提供数据存储、业务逻辑和权限校验。
+- **Web → Agent（智能体）**：通过宿主 SDK 获取运行上下文，调用已发布智能体的运行 OpenAPI；按 [运行接口规范](references/agent-runtime-openapi.md) 处理鉴权、会话与流式响应。
 
 - 脚本兼容：应用 `package.json` 不设置 `"type": "module"`，页面不使用 `<script type="module">`；发布产物使用普通 `.js` 脚本，不交付需要浏览器加载的 `.mjs` 或原生 ES Module。源码模块需经构建合并为 IIFE/普通脚本，具体要求见 [构建与站点](references/web-app-development.md#构建与站点)。
 - 数据存储：创建 CloudCC 自定义对象和字段，保存业务数据；先核对已有对象与字段，避免重复创建。对象、字段的业务引用使用 API Name，不在代码或可分发包中写死源 org 的内部 ID。

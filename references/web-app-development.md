@@ -4,13 +4,13 @@
 
 ## 构建与站点
 
-React、Vue 或原生前端均可，交付静态构建目录，根层必须有 index.html。不要交付 node_modules、开发服务器、SSR 服务或源码目录。资源地址相对站点目录；多页面应用应明确入口，SPA 默认使用 hash 路由，除非实际站点已验证 history fallback。在非根子路径验证 JS/CSS、图片、字体、动态加载和页面刷新，不能只测试开发服务器。
+使用原生 Web（HTML、CSS、JavaScript）开发，交付静态构建目录，根层必须有 index.html。不要交付 node_modules、开发服务器、SSR 服务或源码目录。资源地址相对站点目录；多页面应用应明确入口，SPA 默认使用 hash 路由，除非实际站点已验证 history fallback。在非根子路径验证 JS/CSS、图片、字体、动态加载和页面刷新，不能只测试开发服务器。
 
 ### 脚本格式兼容要求
 
 - 应用 `package.json` 不设置 `"type": "module"`；Node 构建脚本使用 CommonJS，按需使用 `.cjs` 扩展名。
 - 页面使用普通 `<script src="./app.js" defer></script>`，不使用 `<script type="module">`，动态创建的 script 也不得设置 `type = "module"`。
-- 发布的浏览器脚本使用 `.js`，不发布需要浏览器请求的 `.mjs` 文件。React/Vue 或原生源码可使用 import/export，但须在构建阶段合并为 IIFE/普通脚本；最终产物不依赖浏览器原生 import/export、动态 import()、顶层 await 或 modulepreload。异步初始化放入 async 函数中执行。
+- 发布的浏览器脚本使用 `.js`，不发布需要浏览器请求的 `.mjs` 文件。原生 JavaScript 源码可使用 import/export，但须在构建阶段合并为 IIFE/普通脚本；最终产物不依赖浏览器原生 import/export、动态 import()、顶层 await 或 modulepreload。异步初始化放入 async 函数中执行。
 - 发布前检查实际构建目录的 HTML 与 JS，而非仅检查源码或开发服务器。部署后核对脚本响应为 JavaScript MIME 类型，并在 CRM 实际容器中验证 SDK 握手和业务启动；HTTP 200 不代表脚本可执行。已发布版本不可直接覆盖，兼容修复使用新版本。
 
 现有 UAT 静态资源服务对 `.mjs` 返回 `application/octet-stream`，浏览器会拒绝将其作为模块执行，从而导致应用初始化超时。上述规则是 AI App 的交付约束，不要求修改平台自身或其他独立项目的模块方案。
@@ -25,7 +25,7 @@ React、Vue 或原生前端均可，交付静态构建目录，根层必须有 i
 
 CRM开发凭据与CLI缓存由多个应用共用项目根目录文件，类源码仍由CLI维护在对应应用内；类操作使用 [共用配置适配入口](cloudcc-shared-config.md)，不在各应用另配凭据或移动代码。
 
-标准架构为 **Web → 自定义类 → 自定义对象**。Web 继续按上述方式构建、部署和嵌入；CloudCC 提供数据存储和业务逻辑。
+业务架构包含 **Web → 自定义类 → 自定义对象** 与 **Web → Agent（智能体）** 两条调用链，按业务需要选择或组合。CloudCC 提供数据存储和业务逻辑，Agent 提供 AI 对话与任务处理；Web 按上述方式构建、部署和嵌入。智能体调用要求见下文 [用户与智能体接入](#用户与智能体接入)。
 
 需要持久化时，先核对目标业务模型，创建 CloudCC 自定义对象和字段。明确对象/字段 API Name、类型、关系和访问权限；代码使用 API Name 引用，在目标 org 安装时再解析平台接口所需的内部 ID。不要把业务数据存入浏览器 localStorage 作为正式存储，也不要求开发者另外搭建数据库。
 
@@ -69,7 +69,7 @@ const order = result.data;
 
 ## 用户与智能体接入
 
-目前真实运行接口见 [agent-runtime-openapi.md](agent-runtime-openapi.md)，使用 Agent API Key；开发者密钥用于管理，不能直接用于运行。Web 前端不嵌入开发者 Secret 或长期 Agent API Key。
+**Web → Agent（智能体）** 使用已发布智能体的运行 OpenAPI，宿主 SDK 提供当前安装实例的运行上下文；具体接口见 [agent-runtime-openapi.md](agent-runtime-openapi.md)，使用 Agent API Key；开发者密钥用于管理，不能直接用于运行。Web 前端不嵌入开发者 Secret 或长期 Agent API Key。
 
 运行请求直接使用 `context.apiBase`，它已包含 `/openapi/v1`；业务代码只追加相对端点，不得硬编码该前缀或在缺失时自动补齐。独立本地测试的 `localContext.apiBase` 必须配置完整 API 基地址，例如 `http://127.0.0.1:8080/openapi/v1`。地址拼接与验收见 [运行接口地址规范](agent-runtime-openapi.md#apiBase-与请求路径)。
 
@@ -168,7 +168,7 @@ CloudCC 菜单、按钮和浮动入口统一加载 `frontend/public/sdk/agentcic
 
 项目已提供 `frontend/public/sdk/agentcici-app.js`。菜单和脚本按钮调用 `AgentCiCiApp.mount({appCode, launcherId})`，全局悬浮入口调用 `AgentCiCiApp.start({appCode, launcherId})`。位置和 iframe/Shadow DOM 渲染方式由安装快照中对应入口的 renderConfig 决定；旧清单回退应用级 renderConfig。入口不再内联 runtime 请求、CCDK 换票或 iframe DOM。
 
-普通页面继续使用上述协议，context 额外提供 display、pageContext；存在连接应用时附加 cloudccContext。业务关闭方式、宿主层级和 CloudCC SSO 票据参数必须由各应用的 host 清单声明，公共 SDK 只执行通用协议，不识别具体 appCode、业务路由或票据前缀。Shadow DOM 应用通过 register 挂载，普通 React/Vue 应用继续使用 iframe，无需增加嵌入构建。SDK 已实现不代表目标环境已部署；不得在菜单里嵌入真实密钥。
+普通页面继续使用上述协议，context 额外提供 display、pageContext；存在连接应用时附加 cloudccContext。业务关闭方式、宿主层级和 CloudCC SSO 票据参数必须由各应用的 host 清单声明，公共 SDK 只执行通用协议，不识别具体 appCode、业务路由或票据前缀。Shadow DOM 应用通过 register 挂载，原生 Web 页面可使用 iframe，无需增加嵌入构建。SDK 已实现不代表目标环境已部署；不得在菜单里嵌入真实密钥。
 
 应用版本「安装内容」的四层入口配置按 CRM 资源、触发入口、展示位置、渲染方式填写。每个入口保存自己的 renderConfig：renderer 为 iframe 或 shadow-dom，entryUrl/entryPath 为入口地址，positions 为有序多选（第一项默认），并包含 closeBehavior 与 hostLayer。setup-svc 保存快照，按 steps 创建对应 CRM 资源并保留资源 ID；思思快捷菜单从已安装菜单的真实 ID 生成。CRM 启动脚本加载固定 agentcici-app@1.1.0.js 后传 appCode 和 launcherId。
 

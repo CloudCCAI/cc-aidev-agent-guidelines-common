@@ -11,7 +11,7 @@
 - 开发 AI Web 应用，生成 CloudCC 菜单、按钮或全局入口。
 - 准备、校验和提交 AI 应用发布申请包。
 
-当前版本：`1.6.4`
+当前版本：`1.6.5`
 
 ## 安装 Skill
 
@@ -26,6 +26,8 @@
 也可以直接描述 AgentCiCi 相关任务，由 Codex 自动选择本 Skill。
 
 ## AI App开发
+
+Web 使用原生 HTML、CSS、JavaScript；业务按需采用 Web → 自定义类 → 自定义对象、Web → Agent（智能体）两条调用链。
 
 按 [七阶段流程](references/development-workflow.md) 完成需求、设计、开发、本地联调、打包组织发布和CRM菜单系统测试。支持Web、对象/字段、自定义类，以及智能体、技能、知识库和MCP关联；分别配置AgentCiCi与CloudCC CRM开发凭据。新增知识库管理及组织应用发布需部署对应后端并授予scope，不能将本地工具更新视为线上接口已生效。
 
