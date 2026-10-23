@@ -1,6 +1,6 @@
 # AgentCiCi 开发与管理 Skill
 
-`cc-aidev-agent-guidelines-common` 是给 Codex 等 AI 智能体使用的 AgentCiCi 技能包。用户只需要用自然语言说明想做什么，Skill 会自动读取必要规范、调用内置工具并返回结果。
+`agentcici-customization-expert` 是给 Codex 等 AI 智能体使用的 AgentCiCi 技能包。用户只需要用自然语言说明想做什么，Skill 会自动读取必要规范、调用内置工具并返回结果。
 
 它可以帮你：
 
@@ -12,17 +12,17 @@
 - 开发 AI Web 应用，生成 CloudCC 菜单、按钮或全局入口。
 - 准备、校验和提交 AI 应用发布申请包。
 
-当前版本：`1.7.3`
+当前版本：`1.7.4`
 
 ## 安装 Skill
 
 把本仓库地址发给 Codex，然后说：
 
-> 请从 https://github.com/CloudCCAI/cc-aidev-agent-guidelines-common 安装 AgentCiCi Skill。
+> 请从 https://github.com/CloudCCAI/agentcici-customization-expert 安装 AgentCiCi Skill。
 
 安装后，可以显式指定 Skill：
 
-> 使用 $cc-aidev-agent-guidelines-common 查看当前组织的智能体。
+> 使用 $agentcici-customization-expert 查看当前组织的智能体。
 
 也可以直接描述 AgentCiCi 相关任务，由 Codex 自动选择本 Skill。
 
