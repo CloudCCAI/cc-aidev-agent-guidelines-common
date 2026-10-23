@@ -68,7 +68,7 @@ connectedApplications是可选布尔开关，缺省为true，转换为requiresCo
 }
 ```
 
-对象JSON可用apiName/label/nameLabel/dataType/showFormat/beginIndex/remark；字段JSON可用apiName/objectApiName/label/fieldType/length/decimalPlaces/lookupObjectApiName/childrelationName/remark。支持字段类型S/N/P/c/C/D/T/B/E/U/Y/M，平台其他字段能力不等于本安装器已支持；关系字段必须有目标API名和childrelationName，数值精度按平台限制。开发定义超出此范围时明确列出差异，不擅自丢字段。类交付文件是通过CLI创建并验证后的SOURCE内容，保留开发目录中的原始CLI文件，不打包其config.json中的远端ID。
+对象JSON可用apiName/label/nameLabel/dataType/showFormat/beginIndex/remark；字段JSON可用apiName/objectApiName/label/fieldType/length/decimalPlaces/lookupObjectApiName/childrelationName/remark/maxFiles/imageInputMode。支持字段类型S/N/P/c/C/D/T/B/E/U/Y/M/F/X/J/A/H/IMG/FL，平台其他字段能力不等于本安装器已支持；关系字段必须有目标API名和childrelationName，数值精度按平台限制。开发定义超出此范围时明确列出差异，不擅自丢字段。类交付文件是通过CLI创建并验证后的SOURCE内容，保留开发目录中的原始CLI文件，不打包其config.json中的远端ID。
 
 MCP和工具声明在mcpServers/tools，工具依赖用agent.tools中的bindingRef→ref映射，技能与知识依赖同样按原生导出ref映射。MCP/工具配置见 [MCP模块](mcp-tools.md)，不要把源服务响应（含认证字段）整段复制进发布清单。
 
@@ -96,3 +96,19 @@ python3 /installed/agentcici/scripts/agentcici_application.py delete APP_CODE --
 ```
 
 先get核对名称、代码及版本，取得用户对该精确应用的明确删除授权；`--confirm-id` 必须与目标appCode相同，不能凭占位符执行。此命令删除整个应用及全部版本包、资源文件和发布站点，成功返回appCode与deleted=true，不是只删除最新版本。不可恢复，需要保留时先下载原包。存在安装记录或市场引用时服务端拒绝；不自动卸载CRM资源、撤回市场申请或删除客户业务数据，不删除组织独立智能体/技能/知识库。失败展示原错误，不自动重试；响应丢失时先查询核实，不把超时当作删除成功。应用代码及已使用版本不会因删除变成可重用。
+
+
+### 扩展字段长度与上传配置（1.7.6）
+
+应用包安装使用setup-svc原生字段创建，三端按字段类型校验：
+
+| 类型 | length默认值 | length范围 |
+| --- | --- | --- |
+| X 文本区 | 4000 | 1–4000 |
+| J 长文本、A 富文本 | 32000 | 1–32000 |
+| N/P/c 数值 | 18 | 1–18，且整数位+decimalPlaces不超过18 |
+| 其他已支持类型 | 80 | 1–4000（保留原有协议，实际配额仍由CRM检查） |
+
+显式length/decimalPlaces必须为JSON整数，不传字符串或浮点数。J的MetadataService专属131072上限不适用于此安装链路。IMG/FL可传maxFiles整数1–10，默认1；IMG可传imageInputMode=input或url，默认input。maxFiles映射为原生defaultValue，FL同时设置isrepeat；图片录入方式映射formulaType。暂不打包引用公式、水印配置或真实附件内容。不同字段的属性不可混用。
+
+安装初始只给当前系统管理员字段权限；业务简档和受限财务字段需目标管理员按交付说明授权。L/Q/Z/V/MR/AD/LT/SCORE/加密文本尚未纳入此包协议；C虽在类型白名单，但完整累计汇总配置仍未交付，不以白名单通过代替可安装承诺。

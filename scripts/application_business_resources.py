@@ -4,7 +4,7 @@ import re
 
 FIELDS = {
     'object': {'apiName', 'label', 'nameLabel', 'dataType', 'showFormat', 'beginIndex', 'remark'},
-    'field': {'apiName', 'objectApiName', 'label', 'fieldType', 'length', 'decimalPlaces', 'lookupObjectApiName', 'childrelationName', 'remark'},
+    'field': {'apiName', 'objectApiName', 'label', 'fieldType', 'length', 'decimalPlaces', 'lookupObjectApiName', 'childrelationName', 'remark', 'maxFiles', 'imageInputMode'},
     'class': {'apiName', 'label', 'source', 'remark'},
 }
 
@@ -50,10 +50,16 @@ def validate_resources(resources, files, installation):
         if kind == 'field':
             require(api(payload.get('objectApiName')), '字段缺少所属对象 API Name')
             field_type = payload.get('fieldType')
-            require(field_type in {'S', 'N', 'P', 'c', 'C', 'D', 'T', 'B', 'E', 'U', 'Y', 'M'}, '安装器不支持该字段类型')
+            require(field_type in {'S', 'N', 'P', 'c', 'C', 'D', 'T', 'B', 'E', 'U', 'Y', 'M', 'F', 'X', 'J', 'A', 'H', 'IMG', 'FL'}, '安装器不支持该字段类型')
             numeric = field_type in ('N', 'P', 'c')
-            length, decimals = payload.get('length', 18 if numeric else 80), payload.get('decimalPlaces', 0)
-            require(type(length) is int and type(decimals) is int and 1 <= length <= 4000 and decimals >= 0 and (not numeric or length + decimals <= 18), '字段长度或精度无效')
+            long_text = field_type in ('J', 'A')
+            default_length = 32000 if long_text else 4000 if field_type == 'X' else 18 if numeric else 80
+            length, decimals = payload.get('length', default_length), payload.get('decimalPlaces', 0)
+            require(type(length) is int and type(decimals) is int and 1 <= length <= (32000 if long_text else 4000) and 0 <= decimals <= 18 and (not numeric or length + decimals <= 18), '字段长度或精度无效')
+            if 'maxFiles' in payload:
+                require(field_type in ('IMG', 'FL') and type(payload['maxFiles']) is int and 1 <= payload['maxFiles'] <= 10, '上传数量必须为1至10的整数且仅适用于图片/文件')
+            if 'imageInputMode' in payload:
+                require(field_type == 'IMG' and payload['imageInputMode'] in ('input', 'url'), '图片录入方式无效')
             if field_type in ('Y', 'M'):
                 require(api(payload.get('lookupObjectApiName')) and isinstance(payload.get('childrelationName'), str) and payload['childrelationName'].strip(), '关系字段缺少目标对象或反向关系名称')
         keys.add(key)
