@@ -12,13 +12,15 @@
 - 开发 AI Web 应用，生成 CloudCC 菜单、按钮或全局入口。
 - 准备、校验和提交 AI 应用发布申请包。
 
-当前版本：`1.7.5`
+当前版本：`1.7.6`
+
+仓库名沿用 `cc-aidev-agent-guidelines-common`；技能名称和安装目录使用 `agentcici-customization-expert`。
 
 ## 安装 Skill
 
 把本仓库地址发给 Codex，然后说：
 
-> 请从 https://github.com/CloudCCAI/agentcici-customization-expert 安装 AgentCiCi Skill。
+> 请从 https://github.com/CloudCCAI/cc-aidev-agent-guidelines-common 安装 AgentCiCi Skill。
 
 安装后，可以显式指定 Skill：
 
