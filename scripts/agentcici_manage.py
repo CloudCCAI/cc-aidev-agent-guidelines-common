@@ -218,6 +218,8 @@ def execute(client, args):
     path = base + "/" + urllib.parse.quote(getattr(args, "resource_id", ""), safe="")
     if args.module == "agents" and args.command == "create-api-key":
         body = read_payload(args)
+        body.setdefault("maxPromptChars", 64000)
+        body.setdefault("maxResponseChars", 128000)
         output = pathlib.Path(args.output).expanduser().resolve()
         # Reserve a private destination before creating a remote credential.
         try:

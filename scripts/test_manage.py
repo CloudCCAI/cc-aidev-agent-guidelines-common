@@ -98,13 +98,28 @@ class ManagementTests(unittest.TestCase):
             payload = {'credential': {'id': 17}, 'plainKey': 'test-secret'}
             client.request.return_value = payload
             result = execute(client, parser().parse_args(['agents', 'create-api-key', 'a/b', '--json', '{"name":"test"}', '--output', str(output)]))
-            client.request.assert_called_once_with('POST', '/openapi/v1/management/agents/a%2Fb/api-keys', {'name': 'test'})
+            client.request.assert_called_once_with('POST', '/openapi/v1/management/agents/a%2Fb/api-keys', {'name': 'test', 'maxPromptChars': 64000, 'maxResponseChars': 128000})
             self.assertEqual(json.loads(output.read_text()), payload)
             self.assertEqual(output.stat().st_mode & 0o777, 0o600)
             self.assertEqual(result, {'file': str(output.resolve()), 'credentialId': 17})
             with self.assertRaises(RuntimeError):
                 self.run_command('agents', 'create-api-key', 'a', '--json', '{"name":"test"}', '--output', str(output), client=client)
             self.assertEqual(client.request.call_count, 1)
+
+    def test_create_key_preserves_explicit_character_limits(self):
+        import tempfile
+        from pathlib import Path
+        for limits, expected in [
+            ({'maxPromptChars': 12000}, {'maxPromptChars': 12000, 'maxResponseChars': 128000}),
+            ({'maxResponseChars': 32000}, {'maxPromptChars': 64000, 'maxResponseChars': 32000}),
+            ({'maxPromptChars': 12000, 'maxResponseChars': 32000}, {'maxPromptChars': 12000, 'maxResponseChars': 32000}),
+        ]:
+            with self.subTest(limits=limits), tempfile.TemporaryDirectory() as directory:
+                import json
+                client = Mock()
+                client.request.return_value = {'credential': {'id': 17}, 'plainKey': 'test-secret'}
+                self.run_command('agents', 'create-api-key', 'a', '--json', json.dumps({'name': 'test', **limits}), '--output', str(Path(directory) / 'key.json'), client=client)
+                client.request.assert_called_once_with('POST', '/openapi/v1/management/agents/a/api-keys', {'name': 'test', **expected})
 
     def test_create_key_unknown_result_not_retried_or_leaked(self):
         import tempfile
